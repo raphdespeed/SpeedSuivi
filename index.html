@@ -1,0 +1,1639 @@
+<!DOCTYPE html>
+<html lang="fr" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SpeedSuivi - Suivi de Films, Séries, Animés & K-Dramas</title>
+  <meta name="description" content="Application Web SpeedSuivi pour le suivi de médias (Films, Séries, Animés, K-Dramas) avec le proxy TMDB sécurisé." />
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            darkBg: '#0b0d12',
+            cardBg: '#141721',
+            cardHover: '#1c202e',
+            surfaceBg: '#181b26',
+            netflixRed: '#e50914',
+            netflixRedHover: '#b90710',
+            traktPurple: '#8a2be2',
+            successGreen: '#00e676',
+          },
+          fontFamily: {
+            heading: ['Outfit', 'sans-serif'],
+            body: ['Plus Jakarta Sans', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Vue 3 via CDN -->
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+
+  <style>
+    body {
+      background-color: #0b0d12;
+      color: #f3f4f6;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+    
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0b0d12;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #1c202e;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #e50914;
+    }
+
+    .glass-header {
+      background: rgba(20, 23, 33, 0.88);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+    }
+
+    .poster-overlay {
+      background: linear-gradient(to top, rgba(11, 13, 18, 0.95) 0%, rgba(11, 13, 18, 0.2) 60%, transparent 100%);
+    }
+
+    .modal-backdrop {
+      background: rgba(0, 0, 0, 0.85);
+      backdrop-filter: blur(8px);
+    }
+
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col selection:bg-netflixRed selection:text-white">
+
+  <div id="app" class="flex-1 flex flex-col">
+    <!-- Header Navigation Bar -->
+    <header class="sticky top-0 z-50 glass-header border-b border-white/10 px-4 py-3 md:px-8">
+      <div class="max-w-7xl mx-auto flex items-center justify-between gap-4">
+        
+        <!-- Logo -->
+        <div @click="activeTab = 'in_progress'" class="flex items-center gap-2.5 cursor-pointer select-none group">
+          <span class="text-2xl transform group-hover:scale-110 transition-transform">🍿</span>
+          <h1 class="font-heading font-extrabold text-xl md:text-2xl text-white tracking-tight">
+            Speed<span class="text-netflixRed">Suivi</span>
+          </h1>
+        </div>
+
+        <!-- Desktop Navigation Tabs -->
+        <nav class="hidden md:flex items-center bg-black/40 p-1 rounded-full border border-white/10">
+          <button 
+            @click="activeTab = 'in_progress'"
+            :class="['flex items-center gap-2 font-heading font-semibold text-sm px-4 py-2 rounded-full transition-all', activeTab === 'in_progress' ? 'bg-netflixRed text-white shadow-lg shadow-netflixRed/30' : 'text-gray-400 hover:text-white hover:bg-white/5']"
+          >
+            <span>🚀 En cours</span>
+            <span v-if="countInProgress > 0" class="bg-white/20 text-white text-xs px-2 py-0.5 rounded-full font-bold">
+              {{ countInProgress }}
+            </span>
+          </button>
+
+          <button 
+            @click="activeTab = 'watchlist'"
+            :class="['flex items-center gap-2 font-heading font-semibold text-sm px-4 py-2 rounded-full transition-all', activeTab === 'watchlist' ? 'bg-netflixRed text-white shadow-lg shadow-netflixRed/30' : 'text-gray-400 hover:text-white hover:bg-white/5']"
+          >
+            <span>📌 À voir</span>
+            <span v-if="countWatchlist > 0" class="bg-white/20 text-white text-xs px-2 py-0.5 rounded-full font-bold">
+              {{ countWatchlist }}
+            </span>
+          </button>
+
+          <button 
+            @click="activeTab = 'completed'"
+            :class="['flex items-center gap-2 font-heading font-semibold text-sm px-4 py-2 rounded-full transition-all', activeTab === 'completed' ? 'bg-netflixRed text-white shadow-lg shadow-netflixRed/30' : 'text-gray-400 hover:text-white hover:bg-white/5']"
+          >
+            <span>✅ Terminés</span>
+            <span v-if="countCompleted > 0" class="bg-white/20 text-white text-xs px-2 py-0.5 rounded-full font-bold">
+              {{ countCompleted }}
+            </span>
+          </button>
+
+          <!-- TAB "À REVOIR" -->
+          <button 
+            @click="activeTab = 'favorites'"
+            :class="['flex items-center gap-2 font-heading font-semibold text-sm px-4 py-2 rounded-full transition-all', activeTab === 'favorites' ? 'bg-netflixRed text-white shadow-lg shadow-netflixRed/30' : 'text-gray-400 hover:text-white hover:bg-white/5']"
+          >
+            <span>🔄 À revoir</span>
+            <span v-if="countFavorites > 0" class="bg-white/20 text-white text-xs px-2 py-0.5 rounded-full font-bold">
+              {{ countFavorites }}
+            </span>
+          </button>
+
+          <button 
+            @click="activeTab = 'search'"
+            :class="['flex items-center gap-2 font-heading font-semibold text-sm px-4 py-2 rounded-full transition-all', activeTab === 'search' ? 'bg-netflixRed text-white shadow-lg shadow-netflixRed/30' : 'text-gray-400 hover:text-white hover:bg-white/5']"
+          >
+            <span>🔍 Recherche</span>
+          </button>
+        </nav>
+
+        <!-- Export / Import Actions -->
+        <div class="flex items-center gap-2">
+          <button 
+            @click="exportJSON"
+            class="text-xs font-heading font-semibold px-3 py-1.5 rounded-lg border border-white/10 text-gray-300 hover:bg-white/10 hover:text-white transition-all flex items-center gap-1.5"
+            title="Télécharger une sauvegarde JSON"
+          >
+            <span>📥</span> <span class="hidden sm:inline">Exporter JSON</span>
+          </button>
+
+          <label 
+            class="text-xs font-heading font-semibold px-3 py-1.5 rounded-lg border border-white/10 text-gray-300 hover:bg-white/10 hover:text-white transition-all flex items-center gap-1.5 cursor-pointer"
+            title="Restaurer des données JSON"
+          >
+            <span>📤</span> <span class="hidden sm:inline">Importer JSON</span>
+            <input type="file" @change="importJSON" accept=".json" class="hidden" />
+          </label>
+        </div>
+
+      </div>
+
+      <!-- Sub-Bar Filters: Category & Streaming Platforms -->
+      <div class="max-w-7xl mx-auto mt-3 space-y-2">
+        <div class="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+          <!-- Category Pills -->
+          <span class="text-[11px] font-heading font-bold text-gray-400 uppercase tracking-wider hidden sm:inline">Type :</span>
+          <button 
+            v-for="filter in filterOptions" 
+            :key="filter.id"
+            @click="onSelectCategoryFilter(filter.id)"
+            :class="['text-xs font-heading font-semibold px-3.5 py-1.5 rounded-full whitespace-nowrap border transition-all', activeFilter === filter.id ? 'bg-netflixRed/20 border-netflixRed text-white font-bold' : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10 hover:text-white']"
+          >
+            {{ filter.label }}
+          </button>
+
+          <div class="h-4 w-px bg-white/10 mx-1 hidden sm:block"></div>
+
+          <!-- Streaming Provider Filter Pills (TMDB Discover FR) -->
+          <span class="text-[11px] font-heading font-bold text-gray-400 uppercase tracking-wider hidden sm:inline">Plateforme FR :</span>
+          <button 
+            v-for="provider in providerFilters"
+            :key="provider.id"
+            @click="onSelectProviderFilter(provider.id)"
+            :class="['text-xs font-heading font-semibold px-3 py-1.5 rounded-full whitespace-nowrap border transition-all flex items-center gap-1.5', activeProviderFilter === provider.id ? 'bg-white/20 border-white text-white font-bold' : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10 hover:text-white']"
+          >
+            <span>{{ provider.icon }}</span>
+            <span>{{ provider.label }}</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main App Container -->
+    <main class="max-w-7xl w-full mx-auto p-4 md:p-8 flex-1 pb-24 md:pb-12">
+      
+      <!-- ================= SEARCH TAB ================= -->
+      <div v-if="activeTab === 'search'" class="space-y-6">
+        <div class="space-y-1">
+          <h2 class="font-heading font-bold text-2xl md:text-3xl text-white">🔍 Rechercher sur SpeedSuivi</h2>
+          <p class="text-gray-400 text-sm">Recherche globale tolérante via le proxy sécurisé SpeedSuivi.</p>
+        </div>
+
+        <!-- STABLE SEARCH INPUT (NEVER LOSES FOCUS) -->
+        <div class="relative">
+          <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-lg">🔍</span>
+          <input 
+            v-model="searchQuery"
+            @input="onSearchInput"
+            type="text"
+            placeholder="Rechercher par titre (ex: Queen Woo, The Batman, Squid Game, Attack on Titan...)"
+            class="w-full bg-surfaceBg border-2 border-white/10 rounded-2xl pl-12 pr-10 py-3.5 text-white font-body placeholder-gray-500 focus:outline-none focus:border-netflixRed focus:ring-4 focus:ring-netflixRed/20 transition-all text-base"
+            ref="searchInputRef"
+          />
+          <button 
+            v-if="searchQuery" 
+            @click="searchQuery = ''; onSearchInput();"
+            class="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white text-xl"
+          >&times;</button>
+        </div>
+
+        <!-- Initial Search Loading State -->
+        <div v-if="isSearching" class="flex justify-center py-12">
+          <div class="w-10 h-10 border-4 border-white/10 border-t-netflixRed rounded-full animate-spin"></div>
+        </div>
+
+        <!-- Active Textual Search Results Grid -->
+        <div v-else-if="searchQuery.trim() && filteredSearchResults.length > 0" class="space-y-6">
+          
+          <div class="flex items-center justify-between text-xs text-gray-400 font-heading">
+            <span>{{ filteredSearchResults.length }} résultats affichés</span>
+            <span v-if="totalSearchPages > 1" class="bg-white/5 px-2.5 py-1 rounded-full border border-white/10">
+              Page {{ searchPage }} sur {{ totalSearchPages }} ({{ totalSearchResults }} titres trouvés)
+            </span>
+          </div>
+
+          <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
+            <div 
+              v-for="item in filteredSearchResults" 
+              :key="item.id"
+              class="bg-cardBg border border-white/10 rounded-xl overflow-hidden flex flex-col group hover:-translate-y-1.5 hover:border-white/30 transition-all duration-300 shadow-xl relative"
+            >
+              <!-- Poster Wrapper -->
+              <div class="relative aspect-[2/3] bg-gray-900 overflow-hidden cursor-pointer" @click="openModal(item)">
+                <img 
+                  :src="item.posterPath" 
+                  :alt="item.title" 
+                  @error="handleImgError($event, item.title)"
+                  class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
+                  loading="lazy" 
+                />
+                
+                <div class="absolute inset-0 poster-overlay opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  <span class="bg-netflixRed text-white p-3 rounded-full shadow-lg transform group-hover:scale-110 transition-transform">ℹ️</span>
+                </div>
+
+                <!-- Toggle "À revoir" Button -->
+                <button 
+                  @click.stop="toggleFavorite(item)"
+                  :class="['absolute top-2 right-2 z-10 w-8 h-8 rounded-full backdrop-blur-md flex items-center justify-center text-sm transition-transform active:scale-90 hover:scale-110 shadow border', isFavoriteItem(item.id) ? 'bg-netflixRed/80 text-white border-netflixRed' : 'bg-black/60 text-gray-400 border-white/10 hover:text-white']"
+                  :title="isFavoriteItem(item.id) ? 'Retirer de À revoir' : 'Marquer À revoir'"
+                >
+                  <span>🔄</span>
+                </button>
+
+                <!-- Category & Rating Badges -->
+                <div class="absolute top-2 left-2 flex flex-wrap gap-1 pr-10">
+                  <span 
+                    :class="['text-[10px] font-heading font-bold px-2 py-0.5 rounded backdrop-blur-md shadow', item.category === 'kdrama' ? 'bg-pink-600/90 text-white' : item.category === 'anime' ? 'bg-purple-600/90 text-white' : 'bg-black/80 text-white']"
+                  >
+                    {{ getCategoryBadge(item.category) }}
+                  </span>
+                  <span v-if="item.year" class="bg-black/60 backdrop-blur-md text-gray-300 text-[10px] font-heading px-1.5 py-0.5 rounded">
+                    {{ item.year }}
+                  </span>
+                </div>
+
+                <!-- Async Loaded Streaming Logos -->
+                <div v-if="item.providers && item.providers.length > 0" class="absolute bottom-2 left-2 flex gap-1 bg-black/75 backdrop-blur-md p-1 rounded-lg border border-white/10">
+                  <img 
+                    v-for="prov in item.providers.slice(0, 3)" 
+                    :key="prov.id" 
+                    :src="prov.logo" 
+                    :alt="prov.name" 
+                    :title="prov.name"
+                    class="w-4 h-4 rounded object-cover" 
+                  />
+                  <span v-if="item.providers.length > 3" class="text-[9px] font-bold text-gray-300 self-center px-0.5">+{{ item.providers.length - 3 }}</span>
+                </div>
+              </div>
+
+              <!-- Content & Quick Add Buttons -->
+              <div class="p-3 flex flex-col flex-1">
+                <h3 class="font-heading font-bold text-sm text-white line-clamp-2 mb-2 leading-snug" :title="item.title">{{ item.title }}</h3>
+                
+                <div class="mt-auto pt-2 flex gap-1.5">
+                  <button 
+                    v-if="getItemStatus(item) === 'in_progress'"
+                    @click="openModal(item)"
+                    class="w-full text-xs font-heading font-bold py-1.5 px-2 rounded-lg bg-netflixRed/20 text-netflixRed border border-netflixRed/40 text-center"
+                  >
+                    ✓ En cours
+                  </button>
+                  <button 
+                    v-else-if="getItemStatus(item) === 'watchlist'"
+                    @click="openModal(item)"
+                    class="w-full text-xs font-heading font-bold py-1.5 px-2 rounded-lg bg-traktPurple/20 text-traktPurple border border-traktPurple/40 text-center"
+                  >
+                    ✓ À voir
+                  </button>
+                  <button 
+                    v-else-if="getItemStatus(item) === 'completed'"
+                    @click="openModal(item)"
+                    class="w-full text-xs font-heading font-bold py-1.5 px-2 rounded-lg bg-successGreen/20 text-successGreen border border-successGreen/40 text-center"
+                  >
+                    ✓ Terminé
+                  </button>
+                  <template v-else>
+                    <button 
+                      @click="saveItem(item, 'in_progress')"
+                      class="flex-1 text-xs font-heading font-bold py-1.5 bg-netflixRed hover:bg-netflixRedHover text-white rounded-lg transition-colors"
+                      title="Ajouter à En cours"
+                    >
+                      + En cours
+                    </button>
+                    <button 
+                      @click="saveItem(item, 'watchlist')"
+                      class="flex-1 text-xs font-heading font-bold py-1.5 bg-traktPurple hover:opacity-90 text-white rounded-lg transition-colors"
+                      title="Ajouter à À voir"
+                    >
+                      + À voir
+                    </button>
+                  </template>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bottom Pagination Controls / Infinite Scroll Trigger -->
+          <div class="flex flex-col items-center justify-center pt-8 pb-4 space-y-3">
+            <div v-if="isLoadingMore" class="flex items-center gap-2 text-sm text-gray-400 font-heading">
+              <div class="w-5 h-5 border-2 border-white/20 border-t-netflixRed rounded-full animate-spin"></div>
+              <span>Chargement de la page suivante...</span>
+            </div>
+
+            <button 
+              v-else-if="searchPage < totalSearchPages"
+              @click="loadNextPage"
+              class="bg-surfaceBg hover:bg-cardBg border border-white/15 text-white font-heading font-bold text-sm px-6 py-3 rounded-xl shadow-lg transition-all flex items-center gap-2"
+            >
+              <span>🔽 Charger plus de résultats (Page {{ searchPage + 1 }} sur {{ totalSearchPages }})</span>
+            </button>
+            <span v-else class="text-xs text-gray-500 font-heading italic">Fin des résultats de recherche.</span>
+          </div>
+
+        </div>
+
+        <!-- Search empty state -->
+        <div v-else-if="searchQuery.trim()" class="text-center py-16 space-y-3">
+          <div class="text-5xl">🕵️‍♂️</div>
+          <h3 class="font-heading font-bold text-xl text-white">Aucun résultat trouvé</h3>
+          <p class="text-gray-400 text-sm">Aucun média ne correspond à "{{ searchQuery }}".</p>
+        </div>
+
+        <!-- Trending or Provider Discover Recommendations when search is empty -->
+        <div v-else class="space-y-4">
+          <h3 class="font-heading font-bold text-lg text-white flex items-center gap-2">
+            <span>{{ activeFilter === 'kdrama' ? '🇰🇷 K-Dramas Populaires en Corée & France' : activeProviderFilter === 'all' ? '🔥 Tendances du moment' : '📺 Nouveautés & Populaires' }}</span>
+            <span v-if="activeProviderFilter !== 'all'" class="text-xs bg-white/10 px-2 py-0.5 rounded-full font-normal">
+              {{ getProviderLabel(activeProviderFilter) }} France
+            </span>
+          </h3>
+          
+          <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
+            <div 
+              v-for="item in filteredTrendingResults" 
+              :key="item.id"
+              class="bg-cardBg border border-white/10 rounded-xl overflow-hidden flex flex-col group hover:-translate-y-1.5 hover:border-white/30 transition-all duration-300 shadow-xl relative"
+            >
+              <div class="relative aspect-[2/3] bg-gray-900 overflow-hidden cursor-pointer" @click="openModal(item)">
+                <img 
+                  :src="item.posterPath" 
+                  :alt="item.title" 
+                  @error="handleImgError($event, item.title)"
+                  class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
+                  loading="lazy" 
+                />
+                
+                <button 
+                  @click.stop="toggleFavorite(item)"
+                  :class="['absolute top-2 right-2 z-10 w-8 h-8 rounded-full backdrop-blur-md flex items-center justify-center text-sm transition-transform active:scale-90 hover:scale-110 shadow border', isFavoriteItem(item.id) ? 'bg-netflixRed/80 text-white border-netflixRed' : 'bg-black/60 text-gray-400 border-white/10 hover:text-white']"
+                  :title="isFavoriteItem(item.id) ? 'Retirer de À revoir' : 'Marquer À revoir'"
+                >
+                  <span>🔄</span>
+                </button>
+
+                <div class="absolute top-2 left-2 flex flex-wrap gap-1 pr-10">
+                  <span 
+                    :class="['text-[10px] font-heading font-bold px-2 py-0.5 rounded backdrop-blur-md shadow', item.category === 'kdrama' ? 'bg-pink-600/90 text-white' : item.category === 'anime' ? 'bg-purple-600/90 text-white' : 'bg-black/80 text-white']"
+                  >
+                    {{ getCategoryBadge(item.category) }}
+                  </span>
+                  <span v-if="item.voteAverage" class="bg-amber-500/20 border border-amber-500/40 text-amber-400 text-[10px] font-heading font-bold px-1.5 py-0.5 rounded">
+                    ⭐ {{ item.voteAverage }}
+                  </span>
+                </div>
+
+                <!-- Async Loaded Streaming Logos -->
+                <div v-if="item.providers && item.providers.length > 0" class="absolute bottom-2 left-2 flex gap-1 bg-black/75 backdrop-blur-md p-1 rounded-lg border border-white/10">
+                  <img 
+                    v-for="prov in item.providers.slice(0, 3)" 
+                    :key="prov.id" 
+                    :src="prov.logo" 
+                    :alt="prov.name" 
+                    :title="prov.name"
+                    class="w-4 h-4 rounded object-cover" 
+                  />
+                  <span v-if="item.providers.length > 3" class="text-[9px] font-bold text-gray-300 self-center px-0.5">+{{ item.providers.length - 3 }}</span>
+                </div>
+              </div>
+              <div class="p-3 flex flex-col flex-1">
+                <h3 class="font-heading font-bold text-sm text-white line-clamp-2 mb-2 leading-snug" :title="item.title">{{ item.title }}</h3>
+                <div class="mt-auto pt-2 flex gap-1.5">
+                  <button 
+                    @click="saveItem(item, 'in_progress')"
+                    class="flex-1 text-xs font-heading font-bold py-1.5 bg-netflixRed hover:bg-netflixRedHover text-white rounded-lg transition-colors"
+                  >
+                    + En cours
+                  </button>
+                  <button 
+                    @click="saveItem(item, 'watchlist')"
+                    class="flex-1 text-xs font-heading font-bold py-1.5 bg-traktPurple hover:opacity-90 text-white rounded-lg transition-colors"
+                  >
+                    + À voir
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bottom Pagination Controls for Discover / Trending -->
+          <div class="flex flex-col items-center justify-center pt-8 pb-4 space-y-3">
+            <div v-if="isLoadingMore" class="flex items-center gap-2 text-sm text-gray-400 font-heading">
+              <div class="w-5 h-5 border-2 border-white/20 border-t-netflixRed rounded-full animate-spin"></div>
+              <span>Chargement des titres suivants...</span>
+            </div>
+
+            <button 
+              v-else-if="trendingPage < totalTrendingPages"
+              @click="loadNextPage"
+              class="bg-surfaceBg hover:bg-cardBg border border-white/15 text-white font-heading font-bold text-sm px-6 py-3 rounded-xl shadow-lg transition-all flex items-center gap-2"
+            >
+              <span>🔽 Charger plus de titres (Page {{ trendingPage + 1 }} sur {{ totalTrendingPages }})</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= LIBRARY TABS (En cours / À voir / Terminés / À revoir) ================= -->
+      <div v-else class="space-y-6">
+        <div class="space-y-1">
+          <div class="flex items-center gap-3">
+            <h2 class="font-heading font-bold text-2xl md:text-3xl text-white">
+              {{ activeTab === 'in_progress' ? '🚀 En cours' : activeTab === 'watchlist' ? '📌 À voir' : activeTab === 'completed' ? '✅ Terminés' : '🔄 À revoir' }}
+            </h2>
+            <span class="bg-successGreen/20 border border-successGreen/30 text-successGreen text-xs font-heading font-bold px-2.5 py-0.5 rounded-full">
+              {{ currentLibraryItems.length }}
+            </span>
+          </div>
+          <p class="text-gray-400 text-sm">
+            {{ activeTab === 'in_progress' ? 'Vos séries, animés et films actuellement en cours de visionnage.' : activeTab === 'watchlist' ? 'Votre liste d\'attente de contenus à regarder plus tard.' : activeTab === 'completed' ? 'Historique complet de tous vos médias visionnés.' : 'Vos films et séries préférés enregistrés pour un prochain re-visionnage.' }}
+          </p>
+        </div>
+
+        <!-- Empty State -->
+        <div v-if="currentLibraryItems.length === 0" class="text-center py-16 space-y-4 max-w-md mx-auto">
+          <div class="text-5xl">
+            {{ activeTab === 'in_progress' ? '🍿' : activeTab === 'watchlist' ? '📌' : activeTab === 'completed' ? '🎉' : '🔄' }}
+          </div>
+          <h3 class="font-heading font-bold text-xl text-white">Aucun contenu ici</h3>
+          <p class="text-gray-400 text-sm">
+            {{ activeTab === 'in_progress' ? 'Ajoutez vos séries ou films en cours pour suivre votre avancement épisode par épisode !' : activeTab === 'watchlist' ? 'Explorez le catalogue TMDB et enregistrez des médias à voir.' : activeTab === 'completed' ? 'Marquez vos visionnages comme terminés pour remplir cet onglet.' : 'Cliquez sur l\'icône 🔄 sur n\'importe quel film ou série pour l\'ajouter à votre liste \'À revoir\' !' }}
+          </p>
+          <button 
+            @click="activeTab = 'search'"
+            class="bg-netflixRed hover:bg-netflixRedHover text-white font-heading font-bold text-sm px-6 py-2.5 rounded-xl shadow-lg shadow-netflixRed/30 transition-all"
+          >
+            🔍 Rechercher un média
+          </button>
+        </div>
+
+        <!-- Media Grid for Library / Rewatch -->
+        <div v-else class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
+          <div 
+            v-for="item in currentLibraryItems" 
+            :key="item.id"
+            class="bg-cardBg border border-white/10 rounded-xl overflow-hidden flex flex-col group hover:-translate-y-1.5 hover:border-white/30 transition-all duration-300 shadow-xl relative"
+          >
+            <!-- Poster -->
+            <div class="relative aspect-[2/3] bg-gray-900 overflow-hidden cursor-pointer" @click="openModal(item)">
+              <img 
+                :src="item.posterPath" 
+                :alt="item.title" 
+                @error="handleImgError($event, item.title)"
+                class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
+                loading="lazy" 
+              />
+              <div class="absolute inset-0 poster-overlay opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                <span class="bg-netflixRed text-white p-3 rounded-full shadow-lg transform group-hover:scale-110 transition-transform">ℹ️</span>
+              </div>
+
+              <!-- Toggle "À revoir" Button -->
+              <button 
+                @click.stop="toggleFavorite(item)"
+                :class="['absolute top-2 right-2 z-10 w-8 h-8 rounded-full backdrop-blur-md flex items-center justify-center text-sm transition-transform active:scale-90 hover:scale-110 shadow border', isFavoriteItem(item.id) ? 'bg-netflixRed/80 text-white border-netflixRed' : 'bg-black/60 text-gray-400 border-white/10 hover:text-white']"
+                :title="isFavoriteItem(item.id) ? 'Retirer de À revoir' : 'Marquer À revoir'"
+              >
+                <span>🔄</span>
+              </button>
+
+              <div class="absolute top-2 left-2 flex flex-wrap gap-1 pr-10">
+                <span 
+                  :class="['text-[10px] font-heading font-bold px-2 py-0.5 rounded backdrop-blur-md shadow', item.category === 'kdrama' ? 'bg-pink-600/90 text-white' : item.category === 'anime' ? 'bg-purple-600/90 text-white' : 'bg-black/80 text-white']"
+                >
+                  {{ getCategoryBadge(item.category) }}
+                </span>
+                <span v-if="item.year" class="bg-black/60 backdrop-blur-md text-gray-300 text-[10px] font-heading px-1.5 py-0.5 rounded">
+                  {{ item.year }}
+                </span>
+              </div>
+
+              <!-- Streaming Logos -->
+              <div v-if="item.providers && item.providers.length > 0" class="absolute bottom-2 left-2 flex gap-1 bg-black/75 backdrop-blur-md p-1 rounded-lg border border-white/10">
+                <img 
+                  v-for="prov in item.providers.slice(0, 3)" 
+                  :key="prov.id" 
+                  :src="prov.logo" 
+                  :alt="prov.name" 
+                  :title="prov.name"
+                  class="w-4 h-4 rounded object-cover" 
+                />
+                <span v-if="item.providers.length > 3" class="text-[9px] font-bold text-gray-300 self-center px-0.5">+{{ item.providers.length - 3 }}</span>
+              </div>
+            </div>
+
+            <!-- Card Controls & Progress -->
+            <div class="p-3 flex flex-col flex-1 space-y-2">
+              <h3 class="font-heading font-bold text-sm text-white line-clamp-2 mb-2 leading-snug" :title="item.title">{{ item.title }}</h3>
+
+              <!-- IN PROGRESS CONTROLS (+ / - buttons and percentage) -->
+              <template v-if="item.status === 'in_progress'">
+                <div v-if="item.mediaType !== 'movie'" class="space-y-1.5 mt-auto pt-1">
+                  <div class="flex items-center justify-between text-xs font-semibold">
+                    <span class="bg-white/10 text-gray-300 px-1.5 py-0.5 rounded text-[11px]">S{{ item.currentSeason || 1 }}</span>
+                    <span class="text-white font-bold">Ép. {{ item.currentEpisode || 0 }} / {{ item.totalEpisodes || 12 }}</span>
+                  </div>
+
+                  <!-- Progress Bar -->
+                  <div class="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
+                    <div 
+                      class="h-full bg-gradient-to-r from-traktPurple to-netflixRed rounded-full transition-all duration-300"
+                      :style="{ width: getProgressPercent(item) + '%' }"
+                    ></div>
+                  </div>
+                  <div class="text-[10px] text-right font-bold text-gray-400">{{ getProgressPercent(item) }}%</div>
+
+                  <!-- UX Priority + / - Buttons -->
+                  <div class="flex items-center gap-1.5 pt-1">
+                    <button 
+                      @click="changeEpisode(item.id, -1)"
+                      class="w-8 h-8 rounded-md bg-white/10 hover:bg-white/20 text-white font-bold font-heading flex items-center justify-center transition-colors active:scale-90"
+                      title="Décrémenter épisode"
+                    >-</button>
+
+                    <button 
+                      @click="changeEpisode(item.id, 1)"
+                      class="w-8 h-8 rounded-md bg-netflixRed/20 hover:bg-netflixRed text-netflixRed hover:text-white border border-netflixRed/40 font-bold font-heading flex items-center justify-center transition-colors active:scale-90"
+                      title="Incrémenter épisode"
+                    >+</button>
+
+                    <button 
+                      @click="changeStatus(item.id, 'completed')"
+                      class="ml-auto text-[11px] font-heading font-bold px-2 py-1.5 rounded-md bg-successGreen/10 hover:bg-successGreen hover:text-black border border-successGreen/30 text-successGreen transition-colors"
+                      title="Marquer comme Terminé"
+                    >
+                      ✓ Terminé
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Movie in progress -->
+                <div v-else class="mt-auto pt-2 space-y-2">
+                  <div class="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
+                    <div class="h-full bg-netflixRed" :style="{ width: getProgressPercent(item) + '%' }"></div>
+                  </div>
+                  <button 
+                    @click="changeStatus(item.id, 'completed')"
+                    class="w-full text-xs font-heading font-bold py-1.5 rounded-md bg-successGreen/10 hover:bg-successGreen hover:text-black border border-successGreen/30 text-successGreen transition-colors"
+                  >
+                    ✓ Marquer comme vu
+                  </button>
+                </div>
+              </template>
+
+              <!-- WATCHLIST CONTROLS -->
+              <template v-else-if="item.status === 'watchlist'">
+                <div class="mt-auto pt-2 flex gap-1.5">
+                  <button 
+                    @click="changeStatus(item.id, 'in_progress')"
+                    class="flex-1 text-xs font-heading font-bold py-1.5 bg-netflixRed hover:bg-netflixRedHover text-white rounded-lg transition-colors"
+                  >
+                    🚀 Commencer
+                  </button>
+                  <button 
+                    @click="changeStatus(item.id, 'completed')"
+                    class="text-xs font-heading font-bold py-1.5 px-2 bg-white/10 hover:bg-white/20 text-gray-300 rounded-lg transition-colors"
+                    title="Marquer comme terminé"
+                  >
+                    ✓
+                  </button>
+                </div>
+              </template>
+
+              <!-- COMPLETED BADGE -->
+              <template v-else-if="item.status === 'completed'">
+                <div class="mt-auto pt-2">
+                  <span class="block w-full text-center text-xs font-heading font-bold py-1 bg-successGreen/10 text-successGreen border border-successGreen/30 rounded-md">
+                    ✓ Visionné ({{ item.totalEpisodes || 1 }} ép.)
+                  </span>
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+
+    <!-- Mobile Bottom Navigation Bar -->
+    <nav class="md:hidden fixed bottom-0 left-0 right-0 z-50 glass-header border-t border-white/10 p-2 flex justify-around">
+      <button 
+        @click="activeTab = 'in_progress'"
+        :class="['flex flex-col items-center text-[10px] font-heading font-semibold transition-colors relative', activeTab === 'in_progress' ? 'text-netflixRed' : 'text-gray-400']"
+      >
+        <span class="text-lg">🚀</span>
+        <span>En cours</span>
+        <span v-if="countInProgress > 0" class="absolute -top-1 right-1 bg-netflixRed text-white text-[9px] px-1 rounded-full font-bold">
+          {{ countInProgress }}
+        </span>
+      </button>
+
+      <button 
+        @click="activeTab = 'watchlist'"
+        :class="['flex flex-col items-center text-[10px] font-heading font-semibold transition-colors', activeTab === 'watchlist' ? 'text-netflixRed' : 'text-gray-400']"
+      >
+        <span class="text-lg">📌</span>
+        <span>À voir</span>
+      </button>
+
+      <button 
+        @click="activeTab = 'completed'"
+        :class="['flex flex-col items-center text-[10px] font-heading font-semibold transition-colors', activeTab === 'completed' ? 'text-netflixRed' : 'text-gray-400']"
+      >
+        <span class="text-lg">✅</span>
+        <span>Terminés</span>
+      </button>
+
+      <button 
+        @click="activeTab = 'favorites'"
+        :class="['flex flex-col items-center text-[10px] font-heading font-semibold transition-colors relative', activeTab === 'favorites' ? 'text-netflixRed' : 'text-gray-400']"
+      >
+        <span class="text-lg">🔄</span>
+        <span>À revoir</span>
+        <span v-if="countFavorites > 0" class="absolute -top-1 right-1 bg-netflixRed text-white text-[9px] px-1 rounded-full font-bold">
+          {{ countFavorites }}
+        </span>
+      </button>
+
+      <button 
+        @click="activeTab = 'search'"
+        :class="['flex flex-col items-center text-[10px] font-heading font-semibold transition-colors', activeTab === 'search' ? 'text-netflixRed' : 'text-gray-400']"
+      >
+        <span class="text-lg">🔍</span>
+        <span>Recherche</span>
+      </button>
+    </nav>
+
+    <!-- ================= MEDIA DETAIL MODAL ================= -->
+    <div v-if="selectedMedia" class="fixed inset-0 z-[100] modal-backdrop flex items-center justify-center p-4">
+      <div class="bg-cardBg border border-white/10 rounded-2xl max-w-2xl w-full max-h-[88vh] overflow-y-auto shadow-2xl relative animate-fadeIn flex flex-col no-scrollbar">
+        
+        <!-- Close Button -->
+        <button 
+          @click="selectedMedia = null"
+          class="absolute top-4 right-4 z-20 w-9 h-9 rounded-full bg-black/60 hover:bg-netflixRed text-white text-xl flex items-center justify-center transition-colors shadow-lg"
+        >&times;</button>
+
+        <!-- Backdrop Header -->
+        <div 
+          class="min-h-[220px] bg-cover bg-center relative p-6 flex items-end shrink-0"
+          :style="{ backgroundImage: selectedMedia.backdropPath ? `linear-gradient(to bottom, rgba(11, 13, 18, 0.3), rgba(20, 23, 33, 0.95)), url('${selectedMedia.backdropPath}')` : 'none' }"
+        >
+          <div class="flex gap-4 items-end transform translate-y-6 w-full">
+            <img 
+              :src="selectedMedia.posterPath" 
+              :alt="selectedMedia.title" 
+              @error="handleImgError($event, selectedMedia.title)"
+              class="w-24 md:w-28 aspect-[2/3] object-cover rounded-lg border-2 border-white/20 shadow-2xl shrink-0" 
+            />
+            <div class="space-y-1.5 flex-1 min-w-0">
+              <div class="flex flex-wrap gap-1.5 items-center">
+                <span 
+                  :class="['text-[11px] font-heading font-bold px-2 py-0.5 rounded shadow', selectedMedia.category === 'kdrama' ? 'bg-pink-600 text-white' : selectedMedia.category === 'anime' ? 'bg-purple-600 text-white' : 'bg-netflixRed text-white']"
+                >
+                  {{ getCategoryBadge(selectedMedia.category) }}
+                </span>
+                <span v-if="selectedMedia.year" class="bg-black/60 text-gray-300 text-[11px] font-heading px-2 py-0.5 rounded">
+                  {{ selectedMedia.year }}
+                </span>
+                <span v-if="selectedMedia.voteAverage" class="bg-amber-500/20 text-amber-400 text-[11px] font-heading font-bold px-2 py-0.5 rounded">
+                  ⭐ {{ selectedMedia.voteAverage }}/10
+                </span>
+                <button 
+                  @click="toggleFavorite(selectedMedia)"
+                  :class="['ml-auto text-xs font-heading font-bold px-3 py-1 rounded-full flex items-center gap-1 border transition-all active:scale-95 shadow', isFavoriteItem(selectedMedia.id) ? 'bg-netflixRed text-white border-netflixRed' : 'bg-white/10 hover:bg-white/20 text-gray-300 border-white/10']"
+                >
+                  <span>🔄</span>
+                  <span>{{ isFavoriteItem(selectedMedia.id) ? 'À revoir' : 'Marquer À revoir' }}</span>
+                </button>
+              </div>
+              <h2 class="font-heading font-extrabold text-xl md:text-2xl text-white whitespace-normal break-words leading-tight" :title="selectedMedia.title">{{ selectedMedia.title }}</h2>
+              <p v-if="selectedMedia.originalTitle && selectedMedia.originalTitle !== selectedMedia.title" class="text-xs text-gray-400 italic whitespace-normal break-words">
+                {{ selectedMedia.originalTitle }}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Modal Body Content -->
+        <div class="p-6 pt-10 space-y-6 flex-1">
+          
+          <!-- Stream Platforms Section in France -->
+          <div class="space-y-2">
+            <h4 class="text-xs font-heading font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+              <span>📺</span> <span>Disponible en France sur :</span>
+            </h4>
+            <div v-if="selectedMedia.providers && selectedMedia.providers.length > 0" class="flex flex-wrap gap-2 pt-1">
+              <div 
+                v-for="prov in selectedMedia.providers" 
+                :key="prov.id"
+                class="flex items-center gap-2 bg-surfaceBg border border-white/10 px-3 py-1.5 rounded-lg text-xs font-heading font-semibold text-white shadow"
+              >
+                <img v-if="prov.logo" :src="prov.logo" :alt="prov.name" class="w-5 h-5 rounded object-cover" />
+                <span>{{ prov.name }}</span>
+              </div>
+            </div>
+            <p v-else class="text-xs text-gray-500 italic">Recherche des plateformes de streaming en cours ou indisponible en abonnement direct en France.</p>
+          </div>
+
+          <div class="space-y-2">
+            <h4 class="text-xs font-heading font-bold text-gray-400 uppercase tracking-wider">Synopsis</h4>
+            <p class="text-sm text-gray-300 leading-relaxed">{{ selectedMedia.overview || 'Aucun synopsis disponible.' }}</p>
+          </div>
+
+          <!-- Status Editor -->
+          <div class="bg-surfaceBg p-4 rounded-xl border border-white/10 space-y-4">
+            <h4 class="text-xs font-heading font-bold text-gray-400 uppercase tracking-wider">Statut de visionnage</h4>
+            
+            <div class="flex gap-2">
+              <button 
+                @click="modalStatus = 'in_progress'"
+                :class="['flex-1 py-2 text-xs font-heading font-bold rounded-lg border transition-all', modalStatus === 'in_progress' ? 'bg-netflixRed border-netflixRed text-white' : 'bg-white/5 border-white/10 text-gray-400 hover:text-white']"
+              >🚀 En cours</button>
+              <button 
+                @click="modalStatus = 'watchlist'"
+                :class="['flex-1 py-2 text-xs font-heading font-bold rounded-lg border transition-all', modalStatus === 'watchlist' ? 'bg-traktPurple border-traktPurple text-white' : 'bg-white/5 border-white/10 text-gray-400 hover:text-white']"
+              >📌 À voir</button>
+              <button 
+                @click="modalStatus = 'completed'"
+                :class="['flex-1 py-2 text-xs font-heading font-bold rounded-lg border transition-all', modalStatus === 'completed' ? 'bg-successGreen border-successGreen text-black font-bold' : 'bg-white/5 border-white/10 text-gray-400 hover:text-white']"
+              >✅ Terminé</button>
+            </div>
+
+            <!-- Season / Episode Number Inputs -->
+            <div v-if="selectedMedia.mediaType !== 'movie'" class="flex flex-wrap gap-4 pt-2 border-t border-white/10 items-center">
+              <div class="flex items-center gap-2">
+                <label class="text-xs font-semibold text-gray-300">Saison :</label>
+                <input 
+                  type="number" 
+                  min="1" 
+                  v-model.number="modalSeason" 
+                  class="w-16 bg-cardBg border border-white/10 rounded-md px-2 py-1 text-sm font-bold text-white focus:outline-none focus:border-netflixRed"
+                />
+              </div>
+
+              <div class="flex items-center gap-2">
+                <label class="text-xs font-semibold text-gray-300">Épisode vu :</label>
+                <input 
+                  type="number" 
+                  min="0" 
+                  :max="selectedMedia.totalEpisodes || 999" 
+                  v-model.number="modalEpisode" 
+                  class="w-20 bg-cardBg border border-white/10 rounded-md px-2 py-1 text-sm font-bold text-white focus:outline-none focus:border-netflixRed"
+                />
+                <span class="text-xs text-gray-400 font-semibold">/ {{ selectedMedia.totalEpisodes || 12 }} ép.</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Actions -->
+          <div class="flex justify-between items-center pt-2">
+            <button 
+              v-if="isItemSaved(selectedMedia.id)"
+              @click="removeFromLibrary(selectedMedia.id)"
+              class="text-xs font-heading font-semibold text-red-400 hover:text-red-300 px-3 py-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 transition-all"
+            >
+              🗑️ Retirer de ma liste
+            </button>
+            <div class="ml-auto flex gap-2">
+              <button 
+                @click="selectedMedia = null"
+                class="text-xs font-heading font-semibold px-4 py-2 rounded-lg border border-white/10 text-gray-300 hover:bg-white/10"
+              >
+                Annuler
+              </button>
+              <button 
+                @click="saveModalChanges"
+                class="text-xs font-heading font-bold px-5 py-2 rounded-lg bg-netflixRed hover:bg-netflixRedHover text-white shadow-lg shadow-netflixRed/30 transition-all"
+              >
+                💾 Enregistrer
+              </button>
+            </div>
+          </div>
+
+          <!-- TMDB Recommendations & Similar Titles Carousel (STRICTLY BELOW ACTION BUTTONS) -->
+          <div class="space-y-3 pt-6 border-t border-white/10">
+            <h4 class="text-xs font-heading font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+              <span>💡</span> <span>RECOMMANDATIONS & TITRES SIMILAIRES :</span>
+            </h4>
+
+            <div v-if="isLoadingRecommendations" class="flex justify-center py-4">
+              <div class="w-6 h-6 border-2 border-white/20 border-t-netflixRed rounded-full animate-spin"></div>
+            </div>
+
+            <div v-else-if="modalRecommendations.length > 0" class="flex gap-3.5 overflow-x-auto pb-3 pt-1 px-1 scroll-smooth no-scrollbar">
+              <div 
+                v-for="rec in modalRecommendations" 
+                :key="rec.id"
+                @click="openModal(rec)"
+                class="flex-none w-28 group cursor-pointer space-y-1.5"
+              >
+                <div class="aspect-[2/3] bg-gray-900 rounded-lg overflow-hidden border border-white/10 relative group-hover:border-netflixRed group-hover:scale-105 transition-all shadow-md">
+                  <img 
+                    :src="rec.posterPath" 
+                    :alt="rec.title" 
+                    @error="handleImgError($event, rec.title)"
+                    class="w-full h-full object-cover" 
+                  />
+                </div>
+                <p class="text-[11px] font-heading font-semibold text-gray-300 line-clamp-2 leading-snug group-hover:text-netflixRed transition-colors" :title="rec.title">
+                  {{ rec.title }}
+                </p>
+              </div>
+            </div>
+
+            <p v-else class="text-xs text-gray-500 italic">Aucune recommandation similaire trouvée.</p>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast Notifications Container -->
+    <div class="fixed bottom-6 right-6 z-[200] flex flex-col gap-2 pointer-events-none">
+      <div 
+        v-for="toast in toasts" 
+        :key="toast.id"
+        :class="['px-4 py-3 rounded-xl font-heading text-sm font-semibold text-white shadow-2xl flex items-center gap-2 border animate-bounce-in pointer-events-auto', toast.type === 'success' ? 'bg-surfaceBg border-successGreen/50 border-l-4 border-l-successGreen' : 'bg-surfaceBg border-netflixRed/50 border-l-4 border-l-netflixRed']"
+      >
+        <span>{{ toast.type === 'success' ? '✅' : 'ℹ️' }}</span>
+        <span>{{ toast.message }}</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Application Logic (Vue 3 standalone) -->
+  <script>
+    const { createApp, ref, computed, onMounted, onUnmounted } = Vue;
+
+    // Secure Nginx Proxy Endpoint (API Key managed server-side)
+    const BASE_URL = 'https://api-speedsuivi.raphdespeed.online/3';
+    const POSTER_BASE = 'https://image.tmdb.org/t/p/w500';
+    const BACKDROP_BASE = 'https://image.tmdb.org/t/p/w1280';
+
+    // SVG Fallback for broken/missing poster images
+    const createSvgPlaceholder = (title) => {
+      const cleanTitle = (title || 'Visuel inconnu').replace(/["'<>]/g, '');
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="500" height="750" viewBox="0 0 500 750" fill="none">
+        <rect width="500" height="750" fill="#141721"/>
+        <rect x="20" y="20" width="460" height="710" rx="16" fill="#181b26" stroke="#ffffff" stroke-opacity="0.1" stroke-width="2"/>
+        <text x="250" y="320" font-family="sans-serif" font-size="72" text-anchor="middle" fill="#e50914">🍿</text>
+        <text x="250" y="420" font-family="sans-serif" font-size="24" font-weight="bold" text-anchor="middle" fill="#ffffff">${cleanTitle}</text>
+        <text x="250" y="460" font-family="sans-serif" font-size="16" text-anchor="middle" fill="#9ca3af">Visuel indisponible</text>
+      </svg>`;
+      return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+    };
+
+    createApp({
+      setup() {
+        const activeTab = ref('in_progress');
+        const activeFilter = ref('all');
+        const activeProviderFilter = ref('all');
+
+        const searchQuery = ref('');
+        const searchResults = ref([]);
+        const searchPage = ref(1);
+        const totalSearchPages = ref(1);
+        const totalSearchResults = ref(0);
+
+        const trendingResults = ref([]);
+        const trendingPage = ref(1);
+        const totalTrendingPages = ref(1);
+
+        const isSearching = ref(false);
+        const isLoadingMore = ref(false);
+        const searchInputRef = ref(null);
+
+        const collection = ref([]);
+        const selectedMedia = ref(null);
+        const modalStatus = ref('in_progress');
+        const modalSeason = ref(1);
+        const modalEpisode = ref(0);
+        const modalRecommendations = ref([]);
+        const isLoadingRecommendations = ref(false);
+
+        const toasts = ref([]);
+        let debounceTimer = null;
+
+        const filterOptions = [
+          { id: 'all', label: 'Tous les types' },
+          { id: 'series', label: '📺 Séries' },
+          { id: 'anime', label: '🇯🇵 Animés' },
+          { id: 'kdrama', label: '🇰🇷 K-Dramas' },
+          { id: 'movie', label: '🎬 Films' }
+        ];
+
+        // TMDB Watch Provider IDs in France
+        const providerFilters = [
+          { id: 'all', providerId: null, label: 'Toutes', icon: '🌐' },
+          { id: 'netflix', providerId: 8, label: 'Netflix', icon: '🔴' },
+          { id: 'disney', providerId: 337, label: 'Disney+', icon: '🔵' },
+          { id: 'prime', providerId: 119, label: 'Prime Video', icon: '📦' },
+          { id: 'crunchyroll', providerId: 283, label: 'Crunchyroll', icon: '🟠' },
+          { id: 'paramount', providerId: 531, label: 'Paramount+', icon: '🔷' }
+        ];
+
+        // Load collection from localStorage
+        const loadCollection = () => {
+          try {
+            const saved = localStorage.getItem('media_tracker_v2');
+            if (saved) {
+              collection.value = JSON.parse(saved);
+              collection.value.forEach(item => enrichWatchProviders(item));
+            }
+          } catch (e) {
+            console.error('Error loading collection:', e);
+          }
+        };
+
+        const saveCollection = () => {
+          try {
+            localStorage.setItem('media_tracker_v2', JSON.stringify(collection.value));
+          } catch (e) {
+            console.error('Error saving collection:', e);
+          }
+        };
+
+        // Category detection
+        const detectCategory = (item) => {
+          if (item.media_type === 'movie' || (!item.media_type && item.title && !item.name)) {
+            return 'movie';
+          }
+          const originCountries = item.origin_country || item.production_countries?.map(c => c.iso_3166_1) || [];
+          const genreIds = item.genre_ids || item.genres?.map(g => g.id) || [];
+          const originalLang = item.original_language || '';
+
+          // K-Drama Check (South Korea origin country 'KR' or Korean language 'ko')
+          const isKorean = originCountries.includes('KR') || originalLang === 'ko';
+          if (isKorean && item.media_type !== 'movie') {
+            return 'kdrama';
+          }
+
+          // Anime Check (Japan origin 'JP' or Japanese language 'ja' + Animation genre 16)
+          const isJP = originCountries.includes('JP') || originalLang === 'ja';
+          const isAnim = genreIds.includes(16);
+          if (isJP && isAnim) return 'anime';
+
+          return isAnim ? 'anime' : 'series';
+        };
+
+        const formatItem = (raw) => {
+          const isMovie = raw.media_type === 'movie' || (!raw.media_type && raw.title);
+          const category = detectCategory(raw);
+          const releaseDate = raw.release_date || raw.first_air_date || '';
+          const title = raw.title || raw.name || 'Titre inconnu';
+
+          const posterUrl = raw.poster_path ? `${POSTER_BASE}${raw.poster_path}` : createSvgPlaceholder(title);
+
+          return {
+            id: `${isMovie ? 'movie' : 'tv'}_${raw.id}`,
+            tmdbId: raw.id,
+            mediaType: isMovie ? 'movie' : 'tv',
+            category: category,
+            title: title,
+            originalTitle: raw.original_title || raw.original_name || '',
+            overview: raw.overview || 'Aucun synopsis disponible.',
+            posterPath: posterUrl,
+            backdropPath: raw.backdrop_path ? `${BACKDROP_BASE}${raw.backdrop_path}` : null,
+            releaseDate: releaseDate,
+            year: releaseDate ? releaseDate.substring(0, 4) : '',
+            voteAverage: raw.vote_average ? Math.round(raw.vote_average * 10) / 10 : null,
+            totalSeasons: raw.number_of_seasons || 1,
+            totalEpisodes: raw.number_of_episodes || (isMovie ? 1 : 12),
+            isFavorite: raw.isFavorite || false,
+            providers: [],
+            providersLoaded: false
+          };
+        };
+
+        // Async Watch Providers fetcher for results (France region)
+        const enrichWatchProviders = async (item) => {
+          if (item.providersLoaded) return;
+          try {
+            const type = item.mediaType === 'movie' ? 'movie' : 'tv';
+            const url = `${BASE_URL}/${type}/${item.tmdbId}/watch/providers`;
+            const res = await fetch(url);
+            const data = await res.json();
+            const frData = data.results?.FR;
+
+            const providerList = [];
+            const seen = new Set();
+            const rawProviders = [
+              ...(frData?.flatrate || []),
+              ...(frData?.buy || []),
+              ...(frData?.rent || [])
+            ];
+
+            rawProviders.forEach(p => {
+              if (!seen.has(p.provider_id)) {
+                seen.add(p.provider_id);
+                providerList.push({
+                  id: p.provider_id,
+                  name: p.provider_name,
+                  logo: p.logo_path ? `https://image.tmdb.org/t/p/w92${p.logo_path}` : null
+                });
+              }
+            });
+
+            item.providers = providerList;
+            item.providersLoaded = true;
+          } catch (e) {
+            item.providers = [];
+            item.providersLoaded = true;
+          }
+        };
+
+        // Toggle "À revoir" (Rewatch)
+        const toggleFavorite = (item) => {
+          const itemId = item.id;
+          const existingIndex = collection.value.findIndex(i => i.id === itemId);
+
+          if (existingIndex >= 0) {
+            const currentFav = !!collection.value[existingIndex].isFavorite;
+            collection.value[existingIndex].isFavorite = !currentFav;
+            if (item) item.isFavorite = !currentFav;
+
+            saveCollection();
+            showToast(!currentFav ? `"${item.title}" marqué comme À revoir 🔄` : `"${item.title}" retiré de À revoir`, !currentFav ? 'success' : 'info');
+          } else {
+            const newItem = {
+              ...item,
+              status: 'watchlist',
+              currentSeason: 1,
+              currentEpisode: 0,
+              isFavorite: true,
+              updatedAt: new Date().toISOString()
+            };
+            collection.value.push(newItem);
+            if (item) item.isFavorite = true;
+
+            saveCollection();
+            showToast(`"${item.title}" marqué comme À revoir 🔄`, 'success');
+          }
+        };
+
+        const isFavoriteItem = (itemId) => {
+          const found = collection.value.find(i => i.id === itemId);
+          return found ? !!found.isFavorite : false;
+        };
+
+        // TMDB Multi Search Page 1 (Global & Independent via Nginx Proxy)
+        const onSearchInput = () => {
+          clearTimeout(debounceTimer);
+          searchPage.value = 1;
+          totalSearchPages.value = 1;
+          totalSearchResults.value = 0;
+
+          const rawQuery = searchQuery.value || '';
+          const cleanedQuery = rawQuery.trim();
+
+          if (!cleanedQuery) {
+            searchResults.value = [];
+            isSearching.value = false;
+            fetchDiscoveryContent(1);
+            return;
+          }
+
+          activeFilter.value = 'all';
+          isSearching.value = true;
+
+          debounceTimer = setTimeout(async () => {
+            try {
+              const url = `${BASE_URL}/search/multi?language=fr-FR&query=${encodeURIComponent(cleanedQuery)}&page=1&include_adult=false`;
+              const res = await fetch(url);
+              const data = await res.json();
+              
+              totalSearchPages.value = data.total_pages || 1;
+              totalSearchResults.value = data.total_results || 0;
+
+              const items = (data.results || [])
+                .filter(i => i.media_type === 'movie' || i.media_type === 'tv')
+                .map(formatItem);
+
+              searchResults.value = items;
+              items.forEach(item => enrichWatchProviders(item));
+            } catch (err) {
+              console.error('Search error:', err);
+            } finally {
+              isSearching.value = false;
+            }
+          }, 300);
+        };
+
+        // Load Next Page (Infinite Scroll / Load More via Nginx Proxy)
+        const loadNextPage = async () => {
+          if (isLoadingMore.value || isSearching.value) return;
+
+          const cleanedQuery = searchQuery.value ? searchQuery.value.trim() : '';
+
+          if (cleanedQuery) {
+            if (searchPage.value >= totalSearchPages.value) return;
+            isLoadingMore.value = true;
+            searchPage.value++;
+            try {
+              const url = `${BASE_URL}/search/multi?language=fr-FR&query=${encodeURIComponent(cleanedQuery)}&page=${searchPage.value}&include_adult=false`;
+              const res = await fetch(url);
+              const data = await res.json();
+
+              const newItems = (data.results || [])
+                .filter(i => i.media_type === 'movie' || i.media_type === 'tv')
+                .map(formatItem);
+
+              searchResults.value = [...searchResults.value, ...newItems];
+              newItems.forEach(item => enrichWatchProviders(item));
+            } catch (err) {
+              console.error('Pagination error:', err);
+            } finally {
+              isLoadingMore.value = false;
+            }
+          } 
+          else {
+            if (trendingPage.value >= totalTrendingPages.value) return;
+            isLoadingMore.value = true;
+            trendingPage.value++;
+            await fetchDiscoveryContent(trendingPage.value, true);
+            isLoadingMore.value = false;
+          }
+        };
+
+        // Unified Discovery Engine (K-Drama / Provider / Trending via Nginx Proxy)
+        const fetchDiscoveryContent = async (page = 1, append = false) => {
+          if (!append) isSearching.value = true;
+          try {
+            let movieUrl = '';
+            let tvUrl = '';
+
+            if (activeFilter.value === 'kdrama') {
+              tvUrl = `${BASE_URL}/discover/tv?with_origin_country=KR&with_original_language=ko&language=fr-FR&sort_by=popularity.desc&page=${page}`;
+            } 
+            else if (activeProviderFilter.value !== 'all') {
+              const selected = providerFilters.find(p => p.id === activeProviderFilter.value);
+              const provId = selected?.providerId;
+              if (provId) {
+                movieUrl = `${BASE_URL}/discover/movie?with_watch_providers=${provId}&watch_region=FR&language=fr-FR&sort_by=popularity.desc&page=${page}`;
+                tvUrl = `${BASE_URL}/discover/tv?with_watch_providers=${provId}&watch_region=FR&language=fr-FR&sort_by=popularity.desc&page=${page}`;
+              }
+            } 
+            else {
+              const url = `${BASE_URL}/trending/all/week?language=fr-FR&page=${page}`;
+              const res = await fetch(url);
+              const data = await res.json();
+              totalTrendingPages.value = data.total_pages || 1;
+              const items = (data.results || [])
+                .filter(i => i.media_type === 'movie' || i.media_type === 'tv')
+                .map(formatItem);
+
+              if (append) {
+                trendingResults.value = [...trendingResults.value, ...items];
+              } else {
+                trendingResults.value = items;
+                trendingPage.value = 1;
+              }
+              items.forEach(item => enrichWatchProviders(item));
+              return;
+            }
+
+            const fetches = [];
+            if (movieUrl) fetches.push(fetch(movieUrl).then(r => r.json()));
+            else fetches.push(Promise.resolve({ results: [], total_pages: 1 }));
+
+            if (tvUrl) fetches.push(fetch(tvUrl).then(r => r.json()));
+            else fetches.push(Promise.resolve({ results: [], total_pages: 1 }));
+
+            const [movieData, tvData] = await Promise.all(fetches);
+            totalTrendingPages.value = Math.max(movieData.total_pages || 1, tvData.total_pages || 1);
+
+            const movies = (movieData.results || []).map(i => formatItem({ ...i, media_type: 'movie' }));
+            const tvs = (tvData.results || []).map(i => formatItem({ ...i, media_type: 'tv' }));
+
+            const combined = [];
+            const maxLen = Math.max(movies.length, tvs.length);
+            for (let i = 0; i < maxLen; i++) {
+              if (i < movies.length) combined.push(movies[i]);
+              if (i < tvs.length) combined.push(tvs[i]);
+            }
+
+            if (append) {
+              trendingResults.value = [...trendingResults.value, ...combined];
+            } else {
+              trendingResults.value = combined;
+              trendingPage.value = 1;
+            }
+            combined.forEach(item => enrichWatchProviders(item));
+          } catch (e) {
+            console.error('Discovery error:', e);
+          } finally {
+            if (!append) isSearching.value = false;
+          }
+        };
+
+        // Window Scroll listener for Infinite Scroll
+        const handleScroll = () => {
+          if (activeTab.value !== 'search') return;
+          const scrollPosition = window.innerHeight + window.scrollY;
+          const threshold = document.body.offsetHeight - 500;
+
+          if (scrollPosition >= threshold) {
+            loadNextPage();
+          }
+        };
+
+        const onSelectCategoryFilter = (catId) => {
+          activeFilter.value = catId;
+          trendingPage.value = 1;
+          if (!searchQuery.value.trim()) {
+            fetchDiscoveryContent(1);
+          }
+        };
+
+        const onSelectProviderFilter = (providerIdStr) => {
+          activeProviderFilter.value = providerIdStr;
+          trendingPage.value = 1;
+          if (!searchQuery.value.trim()) {
+            fetchDiscoveryContent(1);
+          }
+        };
+
+        const handleImgError = (event, title) => {
+          event.target.src = createSvgPlaceholder(title);
+        };
+
+        // Save media to collection
+        const saveItem = (item, targetStatus = 'in_progress', seasonEpState = {}) => {
+          const isMovie = item.mediaType === 'movie';
+          const existingIndex = collection.value.findIndex(i => i.id === item.id);
+
+          const defaultTotalEp = item.totalEpisodes || (isMovie ? 1 : 12);
+          let currentEp = seasonEpState.currentEpisode;
+
+          if (currentEp === undefined) {
+            if (targetStatus === 'completed') currentEp = defaultTotalEp;
+            else if (targetStatus === 'in_progress') currentEp = isMovie ? 0 : 1;
+            else currentEp = 0;
+          }
+
+          const entry = {
+            ...item,
+            status: targetStatus,
+            currentSeason: seasonEpState.currentSeason || 1,
+            currentEpisode: currentEp,
+            totalEpisodes: defaultTotalEp,
+            isFavorite: item.isFavorite || (existingIndex >= 0 ? collection.value[existingIndex].isFavorite : false),
+            updatedAt: new Date().toISOString()
+          };
+
+          if (existingIndex >= 0) {
+            collection.value[existingIndex] = { ...collection.value[existingIndex], ...entry };
+          } else {
+            collection.value.push(entry);
+          }
+
+          saveCollection();
+          showToast(`"${item.title}" mis à jour (${targetStatus === 'in_progress' ? 'En cours' : targetStatus === 'completed' ? 'Terminé' : 'À voir'})`, 'success');
+        };
+
+        // Quick Episode +/- Controls
+        const changeEpisode = (itemId, delta) => {
+          const item = collection.value.find(i => i.id === itemId);
+          if (!item) return;
+
+          const maxEp = item.totalEpisodes || 999;
+          let nextEp = (item.currentEpisode || 0) + delta;
+          nextEp = Math.max(0, Math.min(maxEp, nextEp));
+
+          item.currentEpisode = nextEp;
+
+          if (nextEp >= maxEp && item.status === 'in_progress') {
+            item.status = 'completed';
+            showToast(`"${item.title}" marqué comme Terminé ! 🎉`, 'success');
+          } else {
+            showToast(`"${item.title}" : Épisode ${nextEp} / ${maxEp}`, 'info');
+          }
+
+          saveCollection();
+        };
+
+        // Change Media Status
+        const changeStatus = (itemId, newStatus) => {
+          const item = collection.value.find(i => i.id === itemId);
+          if (!item) return;
+
+          item.status = newStatus;
+          if (newStatus === 'completed') {
+            item.currentEpisode = item.totalEpisodes || 1;
+          } else if (newStatus === 'in_progress' && item.currentEpisode === 0) {
+            item.currentEpisode = 1;
+          }
+
+          saveCollection();
+          showToast(`"${item.title}" passé en ${newStatus === 'in_progress' ? 'En cours' : newStatus === 'completed' ? 'Terminé' : 'À voir'}`, 'success');
+        };
+
+        const removeFromLibrary = (itemId) => {
+          collection.value = collection.value.filter(i => i.id !== itemId);
+          saveCollection();
+          selectedMedia.value = null;
+          showToast('Média retiré de votre liste.', 'info');
+        };
+
+        // Open Modal & Fetch Recommendations / Similar Titles via Nginx Proxy
+        const openModal = async (item) => {
+          const existing = collection.value.find(i => i.id === item.id);
+          const activeItem = existing ? { ...item, ...existing } : item;
+
+          selectedMedia.value = activeItem;
+          modalStatus.value = activeItem.status || 'in_progress';
+          modalSeason.value = activeItem.currentSeason || 1;
+          modalEpisode.value = activeItem.currentEpisode || (activeItem.mediaType === 'movie' ? 0 : 0);
+          
+          modalRecommendations.value = [];
+          isLoadingRecommendations.value = true;
+
+          // Fetch watch providers for modal item
+          await enrichWatchProviders(activeItem);
+
+          // Fetch full episode details if needed
+          if (!activeItem.totalEpisodes || activeItem.totalEpisodes === 12) {
+            try {
+              const type = activeItem.mediaType === 'movie' ? 'movie' : 'tv';
+              const res = await fetch(`${BASE_URL}/${type}/${activeItem.tmdbId}?language=fr-FR`);
+              const data = await res.json();
+              if (data.number_of_episodes) {
+                selectedMedia.value.totalEpisodes = data.number_of_episodes;
+                selectedMedia.value.totalSeasons = data.number_of_seasons || 1;
+              }
+            } catch (e) {
+              console.error(e);
+            }
+          }
+
+          // Fetch Recommendations & Similar Titles via Nginx Proxy
+          try {
+            const type = activeItem.mediaType === 'movie' ? 'movie' : 'tv';
+            let recUrl = `${BASE_URL}/${type}/${activeItem.tmdbId}/recommendations?language=fr-FR`;
+            let recRes = await fetch(recUrl);
+            let recData = await recRes.json();
+
+            let recList = (recData.results || []).map(raw => formatItem({ ...raw, media_type: type }));
+
+            // Fallback to /similar if recommendations has fewer than 4 items
+            if (recList.length < 4) {
+              const simUrl = `${BASE_URL}/${type}/${activeItem.tmdbId}/similar?language=fr-FR`;
+              const simRes = await fetch(simUrl);
+              const simData = await simRes.json();
+              const simList = (simData.results || []).map(raw => formatItem({ ...raw, media_type: type }));
+              
+              // Merge lists avoiding duplicates
+              const seenIds = new Set(recList.map(r => r.id));
+              simList.forEach(s => {
+                if (!seenIds.has(s.id)) {
+                  seenIds.add(s.id);
+                  recList.push(s);
+                }
+              });
+            }
+
+            modalRecommendations.value = recList.slice(0, 10);
+          } catch (e) {
+            console.error('Error fetching recommendations:', e);
+            modalRecommendations.value = [];
+          } finally {
+            isLoadingRecommendations.value = false;
+          }
+        };
+
+        const saveModalChanges = () => {
+          if (!selectedMedia.value) return;
+          saveItem(selectedMedia.value, modalStatus.value, {
+            currentSeason: modalSeason.value,
+            currentEpisode: modalEpisode.value
+          });
+          selectedMedia.value = null;
+        };
+
+        const getProgressPercent = (item) => {
+          if (item.mediaType === 'movie') {
+            return item.status === 'completed' ? 100 : (item.currentEpisode > 0 ? 50 : 0);
+          }
+          const total = item.totalEpisodes || 1;
+          const current = item.currentEpisode || 0;
+          return Math.min(100, Math.round((current / total) * 100));
+        };
+
+        const getCategoryBadge = (cat) => {
+          const map = { movie: '🎬 Film', series: '📺 Série', anime: '🇯🇵 Animé', kdrama: '🇰🇷 K-Drama' };
+          return map[cat] || '📺 Série';
+        };
+
+        const getProviderLabel = (provIdStr) => {
+          const found = providerFilters.find(p => p.id === provIdStr);
+          return found ? `${found.icon} ${found.label}` : '';
+        };
+
+        const getItemStatus = (item) => {
+          const found = collection.value.find(i => i.id === item.id);
+          return found ? found.status : null;
+        };
+
+        const isItemSaved = (itemId) => collection.value.some(i => i.id === itemId);
+
+        const exportJSON = () => {
+          const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(collection.value, null, 2));
+          const dlAnchor = document.createElement('a');
+          dlAnchor.setAttribute("href", dataStr);
+          dlAnchor.setAttribute("download", `speedsuivi_backup_${new Date().toISOString().slice(0,10)}.json`);
+          document.body.appendChild(dlAnchor);
+          dlAnchor.click();
+          dlAnchor.remove();
+          showToast('Exportation JSON effectuée !', 'success');
+        };
+
+        const importJSON = (event) => {
+          const file = event.target.files[0];
+          if (!file) return;
+
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            try {
+              const data = JSON.parse(e.target.result);
+              if (Array.isArray(data)) {
+                collection.value = data;
+                saveCollection();
+                showToast(`Importation réussie : ${data.length} médias restaurés !`, 'success');
+              } else {
+                showToast('Fichier JSON invalide.', 'error');
+              }
+            } catch (err) {
+              showToast('Erreur lors du traitement du fichier JSON.', 'error');
+            }
+          };
+          reader.readAsText(file);
+        };
+
+        const showToast = (message, type = 'info') => {
+          const id = Date.now();
+          toasts.value.push({ id, message, type });
+          setTimeout(() => {
+            toasts.value = toasts.value.filter(t => t.id !== id);
+          }, 3000);
+        };
+
+        // Filtered Search Results
+        const filteredSearchResults = computed(() => {
+          let list = searchResults.value;
+          if (activeFilter.value !== 'all') {
+            list = list.filter(i => i.category === activeFilter.value);
+          }
+          return list;
+        });
+
+        // Filtered Trending / Discover Results
+        const filteredTrendingResults = computed(() => {
+          let list = trendingResults.value;
+          if (activeFilter.value !== 'all') {
+            list = list.filter(i => i.category === activeFilter.value);
+          }
+          return list;
+        });
+
+        // Filtered Library Items (Support for 'favorites' / 'À revoir' tab as well!)
+        const currentLibraryItems = computed(() => {
+          let list = [];
+          if (activeTab.value === 'favorites') {
+            list = collection.value.filter(i => !!i.isFavorite);
+          } else {
+            list = collection.value.filter(i => i.status === activeTab.value);
+          }
+
+          if (activeFilter.value !== 'all') {
+            list = list.filter(i => i.category === activeFilter.value);
+          }
+          if (activeProviderFilter.value !== 'all') {
+            const provQuery = activeProviderFilter.value;
+            list = list.filter(i => {
+              if (!i.providers) return false;
+              return i.providers.some(p => {
+                const name = p.name.toLowerCase();
+                if (provQuery === 'netflix') return name.includes('netflix');
+                if (provQuery === 'disney') return name.includes('disney');
+                if (provQuery === 'prime') return name.includes('amazon') || name.includes('prime');
+                if (provQuery === 'crunchyroll') return name.includes('crunchyroll');
+                if (provQuery === 'paramount') return name.includes('paramount');
+                return true;
+              });
+            });
+          }
+          return list;
+        });
+
+        const countInProgress = computed(() => collection.value.filter(i => i.status === 'in_progress').length);
+        const countWatchlist = computed(() => collection.value.filter(i => i.status === 'watchlist').length);
+        const countCompleted = computed(() => collection.value.filter(i => i.status === 'completed').length);
+        const countFavorites = computed(() => collection.value.filter(i => !!i.isFavorite).length);
+
+        onMounted(() => {
+          loadCollection();
+          fetchDiscoveryContent(1);
+          window.addEventListener('scroll', handleScroll);
+        });
+
+        onUnmounted(() => {
+          window.removeEventListener('scroll', handleScroll);
+        });
+
+        return {
+          activeTab,
+          activeFilter,
+          activeProviderFilter,
+          filterOptions,
+          providerFilters,
+          searchQuery,
+          searchResults,
+          searchPage,
+          totalSearchPages,
+          totalSearchResults,
+          trendingResults,
+          trendingPage,
+          totalTrendingPages,
+          isSearching,
+          isLoadingMore,
+          searchInputRef,
+          collection,
+          selectedMedia,
+          modalStatus,
+          modalSeason,
+          modalEpisode,
+          modalRecommendations,
+          isLoadingRecommendations,
+          toasts,
+
+          countInProgress,
+          countWatchlist,
+          countCompleted,
+          countFavorites,
+          currentLibraryItems,
+          filteredSearchResults,
+          filteredTrendingResults,
+
+          onSearchInput,
+          loadNextPage,
+          onSelectCategoryFilter,
+          onSelectProviderFilter,
+          handleImgError,
+          toggleFavorite,
+          isFavoriteItem,
+          saveItem,
+          changeEpisode,
+          changeStatus,
+          removeFromLibrary,
+          openModal,
+          saveModalChanges,
+          getProgressPercent,
+          getCategoryBadge,
+          getProviderLabel,
+          getItemStatus,
+          isItemSaved,
+          exportJSON,
+          importJSON
+        };
+      }
+    }).mount('#app');
+  </script>
+</body>
+</html>
