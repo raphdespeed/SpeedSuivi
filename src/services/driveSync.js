@@ -15,6 +15,7 @@ let accessToken = null;
 let tokenExpiryTime = 0;
 let driveFileId = null;
 let saveDebounceTimer = null;
+let statusChangeCallback = null;
 
 export const driveState = {
   isConnected: false,
@@ -25,17 +26,17 @@ export const driveState = {
 };
 
 /**
- * Save active token info into localStorage for persistent auto-login
+ * Save active token info into localStorage ({ accessToken, expiresAt })
  */
 function saveTokenInfo(token, expiresInSeconds) {
   accessToken = token;
-  const expiresIn = expiresInSeconds || 3590;
-  tokenExpiryTime = Date.now() + (expiresIn - 60) * 1000;
+  const expiresIn = expiresInSeconds || 3600;
+  tokenExpiryTime = Date.now() + (expiresIn * 1000);
 
   try {
     localStorage.setItem(TOKEN_INFO_KEY, JSON.stringify({
-      token: accessToken,
-      expiry: tokenExpiryTime
+      accessToken: accessToken,
+      expiresAt: tokenExpiryTime
     }));
   } catch (e) {
     console.error('Error storing gdrive_token_info:', e);
@@ -43,51 +44,122 @@ function saveTokenInfo(token, expiresInSeconds) {
 }
 
 /**
- * Ensure token is still valid before calling Drive APIs.
- * Performs silent token refresh if expired.
+ * Proactively check if token is valid or expiring within 5 minutes.
+ * If less than 5 mins remain (or expired), attempt silent refresh.
  */
 async function ensureValidToken() {
   if (!accessToken) return false;
 
   const now = Date.now();
-  if (tokenExpiryTime && now < tokenExpiryTime) {
+  const fiveMinutesMs = 5 * 60 * 1000;
+
+  // Token is valid with >5 minutes remaining
+  if (tokenExpiryTime && (tokenExpiryTime - now > fiveMinutesMs)) {
     return true;
   }
 
-  // Token expired -> Attempt Silent Refresh via GIS prompt: ''
+  // Token expiring soon or expired -> Attempt silent refresh in background
   if (tokenClient) {
     return new Promise((resolve) => {
       try {
         tokenClient.requestAccessToken({ prompt: '' });
         setTimeout(() => {
-          if (accessToken && Date.now() < tokenExpiryTime) {
+          if (accessToken && (tokenExpiryTime - Date.now() > 0)) {
             resolve(true);
           } else {
-            console.warn('Silent token refresh expired. Re-auth required.');
-            accessToken = null;
-            tokenExpiryTime = 0;
-            localStorage.removeItem(TOKEN_INFO_KEY);
-            driveState.isConnected = false;
+            console.warn('Silent token refresh did not yield a valid token in time.');
             resolve(false);
           }
-        }, 1500);
+        }, 2000);
       } catch (e) {
-        accessToken = null;
-        driveState.isConnected = false;
+        console.error('Silent token request error:', e);
         resolve(false);
       }
     });
   }
 
-  return true;
+  return false;
+}
+
+/**
+ * Central HTTP fetch wrapper for Drive API requests with 401/403 retry handling.
+ * Does NOT disconnect immediately on 401/403; attempts ONE silent token refresh first.
+ */
+async function fetchWithDriveAuth(url, options = {}) {
+  // Proactive check before request
+  await ensureValidToken();
+
+  if (!accessToken) {
+    return null;
+  }
+
+  const makeRequest = () => {
+    const headers = new Headers(options.headers || {});
+    headers.set('Authorization', `Bearer ${accessToken}`);
+    return fetch(url, { ...options, headers });
+  };
+
+  let response = null;
+  try {
+    response = await makeRequest();
+  } catch (err) {
+    console.error('Network error calling Drive API:', err);
+    return null;
+  }
+
+  // Handle HTTP 401 (Unauthorized) or 403 (Forbidden)
+  if (response && (response.status === 401 || response.status === 403)) {
+    console.warn(`Drive API returned HTTP ${response.status}. Attempting silent token refresh...`);
+
+    if (tokenClient) {
+      const refreshed = await new Promise((resolve) => {
+        try {
+          tokenClient.requestAccessToken({ prompt: '' });
+          setTimeout(() => {
+            if (accessToken && (tokenExpiryTime - Date.now() > 0)) {
+              resolve(true);
+            } else {
+              resolve(false);
+            }
+          }, 2000);
+        } catch (e) {
+          resolve(false);
+        }
+      });
+
+      if (refreshed) {
+        // Retry request once with new token
+        try {
+          response = await makeRequest();
+        } catch (retryErr) {
+          console.error('Network error on retried Drive API request:', retryErr);
+          return null;
+        }
+      }
+    }
+  }
+
+  // Disconnect ONLY IF silent refresh failed and final response is still 401/403
+  if (response && (response.status === 401 || response.status === 403)) {
+    console.error(`Drive API persistent HTTP ${response.status}. Disconnecting user session.`);
+    accessToken = null;
+    tokenExpiryTime = 0;
+    localStorage.removeItem(TOKEN_INFO_KEY);
+    driveState.isConnected = false;
+    if (statusChangeCallback) statusChangeCallback(driveState);
+    return response;
+  }
+
+  return response;
 }
 
 /**
  * Initialize Google Token Client via Google Identity Services (GIS)
- * Handles localStorage persistence and silent background re-auth.
  */
 export function initDriveSync(onStatusChange, onDataReceived) {
-  // 1. Check persistent localStorage token info
+  if (onStatusChange) statusChangeCallback = onStatusChange;
+
+  // 1. Restore cached user and token info from localStorage
   const cachedUser = localStorage.getItem(USER_KEY);
   if (cachedUser) {
     try {
@@ -101,10 +173,14 @@ export function initDriveSync(onStatusChange, onDataReceived) {
   if (cachedTokenInfoStr) {
     try {
       const tokenInfo = JSON.parse(cachedTokenInfoStr);
-      if (tokenInfo && tokenInfo.token && tokenInfo.expiry) {
-        accessToken = tokenInfo.token;
-        tokenExpiryTime = parseInt(tokenInfo.expiry, 10) || 0;
+      const token = tokenInfo.accessToken || tokenInfo.token;
+      const expiresAt = parseInt(tokenInfo.expiresAt || tokenInfo.expiry, 10) || 0;
 
+      if (token && expiresAt) {
+        accessToken = token;
+        tokenExpiryTime = expiresAt;
+
+        // Check if token has more than 5 minutes left
         if (Date.now() < tokenExpiryTime) {
           isCachedTokenValid = true;
           driveState.isConnected = true;
@@ -127,7 +203,7 @@ export function initDriveSync(onStatusChange, onDataReceived) {
         scope: SCOPE,
         callback: async (response) => {
           if (response.error) {
-            console.warn('OAuth GIS Response:', response.error);
+            console.warn('OAuth GIS Response error:', response.error);
             driveState.error = response.error;
             driveState.isSyncing = false;
             driveState.isConnected = false;
@@ -136,7 +212,7 @@ export function initDriveSync(onStatusChange, onDataReceived) {
             return;
           }
 
-          // Save fresh token to localStorage
+          // Save fresh token to localStorage ({ accessToken, expiresAt })
           saveTokenInfo(response.access_token, response.expires_in);
 
           driveState.isConnected = true;
@@ -144,10 +220,8 @@ export function initDriveSync(onStatusChange, onDataReceived) {
 
           // Fetch user profile using Google userInfo API
           try {
-            const userRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-              headers: { Authorization: `Bearer ${accessToken}` }
-            });
-            if (userRes.ok) {
+            const userRes = await fetchWithDriveAuth('https://www.googleapis.com/oauth2/v3/userinfo');
+            if (userRes && userRes.ok) {
               const uData = await userRes.json();
               driveState.user = {
                 email: uData.email,
@@ -169,7 +243,7 @@ export function initDriveSync(onStatusChange, onDataReceived) {
         }
       });
 
-      // 3. Silent re-auth if token was missing or expired but user was previously logged in
+      // 3. Silent re-auth if token was missing or expired
       if (!isCachedTokenValid && (cachedTokenInfoStr || cachedUser)) {
         try {
           tokenClient.requestAccessToken({ prompt: '' });
@@ -197,7 +271,7 @@ export function loginGoogleDrive() {
 }
 
 /**
- * Logout from Google Drive sync and clean localStorage token info
+ * Logout from Google Drive sync and clean localStorage
  */
 export function logoutGoogleDrive(onStatusChange) {
   if (accessToken && window.google?.accounts?.oauth2) {
@@ -228,20 +302,10 @@ export function logoutGoogleDrive(onStatusChange) {
  * Search for existing speedsuivi_data.json file in appDataFolder
  */
 async function findDriveFile() {
-  const isValid = await ensureValidToken();
-  if (!isValid) return null;
   try {
     const url = `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name%3D%27${FILE_NAME}%27%20and%20trashed%3Dfalse`;
-    const res = await fetch(url, {
-      headers: { Authorization: `Bearer ${accessToken}` }
-    });
-    if (!res.ok) {
-      if (res.status === 401) {
-        driveState.isConnected = false;
-        localStorage.removeItem(TOKEN_INFO_KEY);
-      }
-      return null;
-    }
+    const res = await fetchWithDriveAuth(url);
+    if (!res || !res.ok) return null;
     const data = await res.json();
     if (data.files && data.files.length > 0) {
       return data.files[0].id;
@@ -257,14 +321,11 @@ async function findDriveFile() {
  * Download collection data from Drive file
  */
 async function downloadDriveFile(fileId) {
-  const isValid = await ensureValidToken();
-  if (!isValid || !fileId) return null;
+  if (!fileId) return null;
   try {
     const url = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`;
-    const res = await fetch(url, {
-      headers: { Authorization: `Bearer ${accessToken}` }
-    });
-    if (!res.ok) return null;
+    const res = await fetchWithDriveAuth(url);
+    if (!res || !res.ok) return null;
     return await res.json();
   } catch (e) {
     console.error('Error downloading Drive file:', e);
@@ -276,8 +337,6 @@ async function downloadDriveFile(fileId) {
  * Create a new file in appDataFolder
  */
 async function createDriveFile(collection) {
-  const isValid = await ensureValidToken();
-  if (!isValid) return null;
   try {
     const metadata = {
       name: FILE_NAME,
@@ -290,12 +349,11 @@ async function createDriveFile(collection) {
     form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
     form.append('file', new Blob([fileContent], { type: 'application/json' }));
 
-    const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+    const res = await fetchWithDriveAuth('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
       method: 'POST',
-      headers: { Authorization: `Bearer ${accessToken}` },
       body: form
     });
-    if (!res.ok) return null;
+    if (!res || !res.ok) return null;
     const data = await res.json();
     return data.id;
   } catch (e) {
@@ -308,19 +366,17 @@ async function createDriveFile(collection) {
  * Update existing file content in Drive
  */
 async function updateDriveFile(fileId, collection) {
-  const isValid = await ensureValidToken();
-  if (!isValid || !fileId) return false;
+  if (!fileId) return false;
   try {
     const fileContent = JSON.stringify(collection, null, 2);
-    const res = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
+    const res = await fetchWithDriveAuth(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
       method: 'PATCH',
       headers: {
-        Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/json'
       },
       body: fileContent
     });
-    return res.ok;
+    return res ? res.ok : false;
   } catch (e) {
     console.error('Error updating Drive file:', e);
     return false;
@@ -408,10 +464,6 @@ export async function syncWithDrive(onDataReceived, onStatusChange) {
  * Force Downward Sync (Cloud -> Local)
  */
 export async function forcePullFromDrive(onDataReceived, onStatusChange) {
-  const isValid = await ensureValidToken();
-  if (!isValid) {
-    throw new Error("Non connecté à Google Drive ou session expirée.");
-  }
   driveState.isSyncing = true;
   if (onStatusChange) onStatusChange(driveState);
 
@@ -440,10 +492,6 @@ export async function forcePullFromDrive(onDataReceived, onStatusChange) {
  * Force Upward Sync (Local -> Cloud)
  */
 export async function forcePushToDrive(currentCollection, onStatusChange) {
-  const isValid = await ensureValidToken();
-  if (!isValid) {
-    throw new Error("Non connecté à Google Drive ou session expirée.");
-  }
   driveState.isSyncing = true;
   if (onStatusChange) onStatusChange(driveState);
 
@@ -476,9 +524,6 @@ export function triggerAutoSaveToDrive(currentCollection, onStatusChange) {
     if (onStatusChange) onStatusChange(driveState);
 
     try {
-      const isValid = await ensureValidToken();
-      if (!isValid) return;
-
       if (!driveFileId) {
         driveFileId = await findDriveFile();
       }
