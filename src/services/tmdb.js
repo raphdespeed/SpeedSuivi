@@ -95,19 +95,24 @@ export async function getMediaDetails(id, mediaType) {
     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
     const data = await response.json();
 
-    // Fallback: If videos.results is empty, do a dedicated videos call with FR/EN/null languages
-    if (!data.videos?.results || data.videos.results.length === 0) {
+    // Fallback: If no valid YouTube video in append_to_response, query /videos with and without language restriction
+    const hasYouTubeVideo = data.videos?.results?.some(v => v && v.site === 'YouTube' && v.key);
+    if (!hasYouTubeVideo) {
       try {
-        const vUrl = `${BASE_URL}/${type}/${id}/videos?include_video_language=fr,en,null`;
-        const vRes = await fetch(vUrl);
-        if (vRes.ok) {
-          const vData = await vRes.json();
-          if (vData.results && vData.results.length > 0) {
-            data.videos = vData;
-          }
+        let vUrl = `${BASE_URL}/${type}/${id}/videos?include_video_language=fr,en,null`;
+        let vRes = await fetch(vUrl);
+        let vData = await vRes.json();
+        if (!vData.results || vData.results.length === 0) {
+          // Direct emergency request without any language filter
+          vUrl = `${BASE_URL}/${type}/${id}/videos`;
+          vRes = await fetch(vUrl);
+          vData = await vRes.json();
+        }
+        if (vData.results && vData.results.length > 0) {
+          data.videos = vData;
         }
       } catch (ve) {
-        console.warn('Dedicated videos fallback error:', ve);
+        console.warn('Exhaustive videos fallback error:', ve);
       }
     }
 
@@ -223,15 +228,17 @@ export function formatMediaItem(rawItem) {
     };
   });
 
-  // Extract Official YouTube Trailer Key (Prioritize FR Trailer > EN Trailer > Any Trailer > Any Teaser > Any YouTube Video)
+  // Extract Official YouTube Trailer Key (Exhaustive Priority: Trailer VF > Trailer VO > Any Trailer > Teaser VF > Teaser VO > Any Teaser > Clip/Featurette > Any YouTube Video)
   const videoResults = rawItem.videos?.results || [];
-  const youtubeVideos = videoResults.filter(v => v && v.site === 'YouTube');
+  const youtubeVideos = videoResults.filter(v => v && v.site === 'YouTube' && v.key);
   let selectedTrailer = 
     youtubeVideos.find(v => v.type === 'Trailer' && v.iso_639_1 === 'fr') ||
-    youtubeVideos.find(v => v.type === 'Trailer' && v.iso_639_1 === 'en') ||
+    youtubeVideos.find(v => v.type === 'Trailer' && (v.iso_639_1 === 'en' || !v.iso_639_1)) ||
     youtubeVideos.find(v => v.type === 'Trailer') ||
     youtubeVideos.find(v => v.type === 'Teaser' && v.iso_639_1 === 'fr') ||
+    youtubeVideos.find(v => v.type === 'Teaser' && (v.iso_639_1 === 'en' || !v.iso_639_1)) ||
     youtubeVideos.find(v => v.type === 'Teaser') ||
+    youtubeVideos.find(v => v.type === 'Clip' || v.type === 'Featurette' || v.type === 'Behind the Scenes') ||
     youtubeVideos[0];
   const trailerKey = selectedTrailer ? selectedTrailer.key : null;
 
