@@ -160,27 +160,29 @@ export function formatMediaItem(rawItem) {
 }
 
 /**
- * Returns the language status: 'VF' | 'VF / VOSTFR' | 'VO'
+ * Returns the language status: 'VF' | 'VOSTFR' | 'VO'
  */
 export function getLanguageStatus(item) {
   if (!item) return 'VO';
   const origLang = item.originalLanguage || item.original_language || '';
 
+  // 1. Langue originale française -> "VF" (Vert)
   if (origLang === 'fr') {
     return 'VF';
   }
 
+  // 2. Traduction française TMDB & original_language !== 'fr' -> "VOSTFR" (Orange)
   const translationsList = item.translations?.translations || (Array.isArray(item.translations) ? item.translations : null);
   if (translationsList && translationsList.length > 0) {
     const frTrans = translationsList.find(t => t.iso_639_1 === 'fr');
     if (frTrans) {
-      return 'VF / VOSTFR';
+      return 'VOSTFR';
     }
     return 'VO';
   }
 
   if (origLang && origLang !== 'fr') {
-    return 'VF / VOSTFR';
+    return 'VOSTFR';
   }
 
   return 'VO';

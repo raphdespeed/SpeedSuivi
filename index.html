@@ -1510,21 +1510,23 @@
           if (!item) return 'VO';
           const origLang = item.originalLanguage || item.original_language || '';
 
+          // 1. Langue originale française -> "VF" (Vert)
           if (origLang === 'fr') {
             return 'VF';
           }
 
+          // 2. Traduction française TMDB & original_language !== 'fr' -> "VOSTFR" (Orange)
           const translationsList = item.translations?.translations || (Array.isArray(item.translations) ? item.translations : null);
           if (translationsList && translationsList.length > 0) {
             const frTrans = translationsList.find(t => t.iso_639_1 === 'fr');
             if (frTrans) {
-              return 'VF / VOSTFR';
+              return 'VOSTFR';
             }
             return 'VO';
           }
 
           if (origLang && origLang !== 'fr') {
-            return 'VF / VOSTFR';
+            return 'VOSTFR';
           }
 
           return 'VO';
@@ -1533,7 +1535,7 @@
         const getLanguageBadgeClass = (item) => {
           const status = getLanguageStatus(item);
           if (status === 'VF') return 'bg-emerald-600/90 text-white border-emerald-400/40';
-          if (status === 'VF / VOSTFR') return 'bg-amber-600/90 text-white border-amber-400/40';
+          if (status === 'VOSTFR') return 'bg-amber-600/90 text-white border-amber-400/40';
           return 'bg-slate-600/90 text-gray-200 border-slate-400/40';
         };
 
