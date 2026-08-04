@@ -100,6 +100,29 @@
       -ms-overflow-style: none;
       scrollbar-width: none;
     }
+
+    .known-for-carousel {
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+      -webkit-overflow-scrolling: touch;
+    }
+    .known-for-carousel::-webkit-scrollbar {
+      height: 6px;
+    }
+    .known-for-carousel::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .known-for-carousel::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 9999px;
+    }
+    .known-for-carousel::-webkit-scrollbar-thumb:hover {
+      background: rgba(229, 9, 20, 0.8);
+    }
+    .known-for-card {
+      flex: 0 0 auto !important;
+      width: 140px !important;
+    }
   </style>
 </head>
 <body class="min-h-screen flex flex-col selection:bg-netflixRed selection:text-white">
@@ -1327,17 +1350,40 @@
             </button>
           </div>
 
-          <!-- "Célèbre pour" Section (Top 8 Most Popular Works) -->
+          <!-- "Célèbre pour" Section (Top 10 Most Popular Works) -->
           <div v-if="selectedPerson?.filmography && selectedPerson.filmography.length > 0" class="space-y-4">
-            <h3 class="text-lg font-heading font-bold text-white flex items-center gap-2">
-              <span>🔥</span> <span>Célèbre pour</span>
-            </h3>
-            <div class="flex gap-4 overflow-x-auto pb-4 pt-1 scroll-smooth no-scrollbar">
+            <div class="flex items-center justify-between">
+              <h3 class="text-lg font-heading font-bold text-white flex items-center gap-2">
+                <span>🔥</span> <span>Célèbre pour</span>
+              </h3>
+              <!-- Arrow Navigation Buttons -->
+              <div class="flex items-center gap-2">
+                <button 
+                  @click="scrollFamousLeft" 
+                  class="w-8 h-8 rounded-full bg-black/60 hover:bg-netflixRed border border-white/10 flex items-center justify-center text-white text-xs font-bold transition-all shadow-md active:scale-95"
+                  title="Défiler vers la gauche"
+                >
+                  ❮
+                </button>
+                <button 
+                  @click="scrollFamousRight" 
+                  class="w-8 h-8 rounded-full bg-black/60 hover:bg-netflixRed border border-white/10 flex items-center justify-center text-white text-xs font-bold transition-all shadow-md active:scale-95"
+                  title="Défiler vers la droite"
+                >
+                  ❯
+                </button>
+              </div>
+            </div>
+
+            <div 
+              ref="famousCarouselRef"
+              class="known-for-carousel flex gap-4 overflow-x-auto pb-3 pt-1 scroll-smooth"
+            >
               <div 
-                v-for="item in selectedPerson.filmography.slice(0, 8)" 
+                v-for="item in selectedPerson.filmography.slice(0, 10)" 
                 :key="`famous_${item.id}`"
                 @click="openMediaDetail(item)"
-                class="flex-none w-36 group cursor-pointer space-y-2"
+                class="known-for-card flex-none w-[140px] group cursor-pointer space-y-2"
               >
                 <div class="aspect-[2/3] bg-gray-900 rounded-xl overflow-hidden border border-white/10 relative group-hover:border-netflixRed group-hover:scale-105 transition-all shadow-xl">
                   <img :src="item.posterPath" :alt="item.title" @error="handleImgError($event, item.title)" class="w-full h-full object-cover" loading="lazy" />
@@ -1816,6 +1862,20 @@
             selectedPerson.value = null;
           } finally {
             isLoadingPerson.value = false;
+          }
+        };
+
+        const famousCarouselRef = ref(null);
+
+        const scrollFamousLeft = () => {
+          if (famousCarouselRef.value) {
+            famousCarouselRef.value.scrollBy({ left: -320, behavior: 'smooth' });
+          }
+        };
+
+        const scrollFamousRight = () => {
+          if (famousCarouselRef.value) {
+            famousCarouselRef.value.scrollBy({ left: 320, behavior: 'smooth' });
           }
         };
 
@@ -2562,6 +2622,9 @@
           closeDetailView,
           openPersonDetail,
           closePersonView,
+          famousCarouselRef,
+          scrollFamousLeft,
+          scrollFamousRight,
           formatDate,
           getAge,
           scrollToTop,
