@@ -12,6 +12,9 @@
   <meta name="apple-mobile-web-app-title" content="SpeedSuivi" />
   <link rel="apple-touch-icon" href="assets/icon-192.png" />
 
+  <!-- Google Identity Services (GIS) for Google Drive AppData Sync -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+
   <!-- Titre et Description standard -->
   <title>SpeedSuivi - Suivi de Films, Séries, Animés & K-Dramas</title>
   <meta name="description" content="Suivez facilement l'avancement de vos séries, animés et films préférés épisode par épisode !" />
@@ -235,7 +238,7 @@
           </button>
         </nav>
 
-        <!-- Export / Import / PWA Actions -->
+        <!-- Export / Import / PWA / Google Drive Actions -->
         <div class="flex items-center gap-2">
           <button 
             v-if="canInstallPwa"
@@ -245,6 +248,37 @@
           >
             <span>📱</span> <span class="hidden sm:inline">Installer l'App</span>
           </button>
+
+          <!-- Google Drive Sync Button / Status Badge -->
+          <button 
+            v-if="!driveSyncState.isConnected"
+            @click="loginDrive"
+            class="text-xs font-heading font-semibold px-3 py-1.5 rounded-lg border border-white/10 text-gray-300 hover:bg-white/10 hover:text-white transition-all flex items-center gap-1.5 bg-surfaceBg"
+            title="Connecter Google Drive pour la synchronisation cloud automatique"
+          >
+            <svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 87.3 78" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/><path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44c-.8 1.4-1.2 2.95-1.2 4.5h27.5z" fill="#00ac47"/><path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l3.85-6.65c.8-1.4 1.2-2.95 1.2-4.5h-27.5l13.75 23.85c1.4 0 3-.4 4.4-1.4z" fill="#ea4335"/><path d="m43.65 25 13.75 23.8h27.5c0-1.55-.4-3.1-1.2-4.5l-25.4-44c-.8-1.4-1.95-2.5-3.3-3.3z" fill="#00832d"/><path d="m57.4 48.8h-27.5l-13.75 23.8c1.35.8 2.9 1.4 4.5 1.4h50.9c1.6 0 3.15-.45 4.5-1.4z" fill="#2684fc"/><path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.4c-1.6 0-3.15.4-4.5 1.2z" fill="#ffba00"/></svg>
+            <span class="hidden sm:inline">Synchro Google Drive</span>
+          </button>
+
+          <div v-else class="flex items-center gap-1.5 bg-surfaceBg border border-emerald-500/30 px-2.5 py-1.5 rounded-lg text-xs font-heading font-semibold">
+            <span v-if="driveSyncState.isSyncing" class="inline-block w-2 h-2 rounded-full bg-amber-400 animate-ping" title="Synchronisation en cours..."></span>
+            <span v-else class="inline-block w-2 h-2 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400" title="Synchronisé avec Google Drive"></span>
+            
+            <img v-if="driveSyncState.user && driveSyncState.user.picture" :src="driveSyncState.user.picture" class="w-4 h-4 rounded-full object-cover" />
+            <span v-else class="text-xs">☁️</span>
+
+            <span class="text-emerald-300 font-bold hidden sm:inline">
+              {{ driveSyncState.isSyncing ? 'Synchro...' : 'Cloud Synchro' }}
+            </span>
+
+            <button 
+              @click="logoutDrive" 
+              class="ml-1 text-gray-400 hover:text-red-400 transition-colors text-sm font-bold"
+              title="Se déconnecter de Google Drive"
+            >
+              &times;
+            </button>
+          </div>
 
           <button 
             @click="exportJSON"
@@ -1582,8 +1616,15 @@
 
   </div>
 
-  <!-- Application Logic (Vue 3 standalone) -->
-  <script>
+  <!-- Application Logic (Vue 3 standalone + Google Drive Sync Service) -->
+  <script type="module">
+    import { 
+      initDriveSync, 
+      loginGoogleDrive, 
+      logoutGoogleDrive, 
+      triggerAutoSaveToDrive 
+    } from './src/services/driveSync.js';
+
     const { createApp, ref, computed, onMounted, onUnmounted, watch, nextTick } = Vue;
 
     // Secure Nginx Proxy Endpoint (API Key managed server-side)
@@ -1766,9 +1807,31 @@
           }
         };
 
+        const driveSyncState = ref({
+          isConnected: false,
+          isSyncing: false,
+          user: null,
+          lastSyncTime: null,
+          error: null
+        });
+
+        const loginDrive = () => {
+          loginGoogleDrive();
+        };
+
+        const logoutDrive = () => {
+          logoutGoogleDrive((st) => {
+            driveSyncState.value = { ...st };
+            showToast('Déconnecté de Google Drive', 'info');
+          });
+        };
+
         const saveCollection = () => {
           try {
             localStorage.setItem('media_tracker_v2', JSON.stringify(collection.value));
+            triggerAutoSaveToDrive(collection.value, (st) => {
+              driveSyncState.value = { ...st };
+            });
           } catch (e) {
             console.error('Error saving collection:', e);
           }
@@ -2871,6 +2934,17 @@
             });
           }
 
+          initDriveSync(
+            (st) => {
+              driveSyncState.value = { ...st };
+            },
+            (mergedCollection) => {
+              collection.value = mergedCollection;
+              collection.value.forEach(item => enrichWatchProviders(item));
+              showToast('Données synchronisées avec Google Drive ! ☁️', 'success');
+            }
+          );
+
           loadCollection();
           fetchRecentReleases();
           fetchDiscoveryContent(1);
@@ -2926,6 +3000,9 @@
           installPWA,
           changeModalSeason,
           onModalSeasonChange,
+          driveSyncState,
+          loginDrive,
+          logoutDrive,
 
           countInProgress,
           countWatchlist,
