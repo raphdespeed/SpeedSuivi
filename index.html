@@ -110,7 +110,7 @@
       <div class="max-w-7xl mx-auto flex items-center justify-between gap-4">
         
         <!-- Logo -->
-        <div @click="activeTab = 'in_progress'" class="flex items-center gap-2.5 cursor-pointer select-none group">
+        <div @click="navigateTo('home')" class="flex items-center gap-2.5 cursor-pointer select-none group">
           <span class="text-2xl transform group-hover:scale-110 transition-transform">🍿</span>
           <h1 class="font-heading font-extrabold text-xl md:text-2xl text-white tracking-tight">
             Speed<span class="text-netflixRed">Suivi</span>
@@ -120,7 +120,14 @@
         <!-- Desktop Navigation Tabs -->
         <nav class="hidden md:flex items-center bg-black/40 p-1 rounded-full border border-white/10">
           <button 
-            @click="activeTab = 'in_progress'"
+            @click="navigateTo('home')"
+            :class="['flex items-center gap-2 font-heading font-semibold text-sm px-4 py-2 rounded-full transition-all', activeTab === 'home' ? 'bg-netflixRed text-white shadow-lg shadow-netflixRed/30' : 'text-gray-400 hover:text-white hover:bg-white/5']"
+          >
+            <span>🏠 Accueil</span>
+          </button>
+
+          <button 
+            @click="navigateTo('in_progress')"
             :class="['flex items-center gap-2 font-heading font-semibold text-sm px-4 py-2 rounded-full transition-all', activeTab === 'in_progress' ? 'bg-netflixRed text-white shadow-lg shadow-netflixRed/30' : 'text-gray-400 hover:text-white hover:bg-white/5']"
           >
             <span>🚀 En cours</span>
@@ -130,7 +137,7 @@
           </button>
 
           <button 
-            @click="activeTab = 'watchlist'"
+            @click="navigateTo('watchlist')"
             :class="['flex items-center gap-2 font-heading font-semibold text-sm px-4 py-2 rounded-full transition-all', activeTab === 'watchlist' ? 'bg-netflixRed text-white shadow-lg shadow-netflixRed/30' : 'text-gray-400 hover:text-white hover:bg-white/5']"
           >
             <span>📌 À voir</span>
@@ -140,7 +147,7 @@
           </button>
 
           <button 
-            @click="activeTab = 'completed'"
+            @click="navigateTo('completed')"
             :class="['flex items-center gap-2 font-heading font-semibold text-sm px-4 py-2 rounded-full transition-all', activeTab === 'completed' ? 'bg-netflixRed text-white shadow-lg shadow-netflixRed/30' : 'text-gray-400 hover:text-white hover:bg-white/5']"
           >
             <span>✅ Terminés</span>
@@ -151,7 +158,7 @@
 
           <!-- TAB "À REVOIR" -->
           <button 
-            @click="activeTab = 'favorites'"
+            @click="navigateTo('favorites')"
             :class="['flex items-center gap-2 font-heading font-semibold text-sm px-4 py-2 rounded-full transition-all', activeTab === 'favorites' ? 'bg-netflixRed text-white shadow-lg shadow-netflixRed/30' : 'text-gray-400 hover:text-white hover:bg-white/5']"
           >
             <span>🔄 À revoir</span>
@@ -161,7 +168,7 @@
           </button>
 
           <button 
-            @click="activeTab = 'search'"
+            @click="navigateTo('search')"
             :class="['flex items-center gap-2 font-heading font-semibold text-sm px-4 py-2 rounded-full transition-all', activeTab === 'search' ? 'bg-netflixRed text-white shadow-lg shadow-netflixRed/30' : 'text-gray-400 hover:text-white hover:bg-white/5']"
           >
             <span>🔍 Recherche</span>
@@ -259,10 +266,147 @@
     </header>
 
     <!-- Main App Container -->
-    <main class="max-w-7xl w-full mx-auto p-4 md:p-8 flex-1 pb-24 md:pb-12">
+    <main v-if="!selectedMedia" class="max-w-7xl w-full mx-auto p-4 md:p-8 flex-1 pb-24 md:pb-12">
       
+      <!-- ================= HOME PAGE (Nouveautés & Sorties Récentes) ================= -->
+      <div v-if="activeTab === 'home'" class="space-y-10 animate-fadeIn">
+        <div class="space-y-1">
+          <h2 class="font-heading font-extrabold text-2xl md:text-3xl text-white flex items-center gap-2.5">
+            <span>🔥</span> <span>Nouveautés & Sorties Récentes</span>
+          </h2>
+          <p class="text-gray-400 text-sm">Découvrez les derniers films, séries, animés et K-Dramas sortis récemment.</p>
+        </div>
+
+        <div v-if="isLoadingHome" class="flex justify-center py-16">
+          <div class="w-10 h-10 border-4 border-white/10 border-t-netflixRed rounded-full animate-spin"></div>
+        </div>
+
+        <div v-else class="space-y-12">
+          <!-- Section 1: Dernières Sorties Films -->
+          <div class="space-y-4">
+            <h3 class="font-heading font-bold text-lg text-white flex items-center gap-2">
+              <span>🎬</span> <span>Dernières Sorties Films</span>
+            </h3>
+            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
+              <div 
+                v-for="item in recentMovies" 
+                :key="item.id"
+                @click="openMediaDetail(item)"
+                class="bg-cardBg border border-white/10 rounded-xl overflow-hidden cursor-pointer group hover:-translate-y-1.5 hover:border-white/30 transition-all duration-300 shadow-xl relative flex flex-col"
+              >
+                <div class="relative aspect-[2/3] bg-gray-900 overflow-hidden">
+                  <img :src="item.posterPath" :alt="item.title" @error="handleImgError($event, item.title)" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
+                  <div class="absolute top-2 left-2 flex gap-1">
+                    <span class="text-[10px] font-heading font-bold px-2 py-0.5 rounded bg-black/80 text-white">🎬 Film</span>
+                    <span v-if="item.year" class="text-[10px] font-heading px-1.5 py-0.5 rounded bg-black/60 text-gray-300">{{ item.year }}</span>
+                  </div>
+                </div>
+                <div class="p-3 flex flex-col flex-1">
+                  <h4 class="font-heading font-bold text-sm text-white line-clamp-2 mb-2 leading-snug" :title="item.title">{{ item.title }}</h4>
+                  <div class="mt-auto pt-2 flex gap-1.5">
+                    <button @click.stop="saveItem(item, 'in_progress')" class="flex-1 text-[11px] font-heading font-bold py-1 bg-netflixRed hover:bg-netflixRedHover text-white rounded-lg transition-colors">+ En cours</button>
+                    <button @click.stop="saveItem(item, 'watchlist')" class="flex-1 text-[11px] font-heading font-bold py-1 bg-traktPurple hover:opacity-90 text-white rounded-lg transition-colors">+ À voir</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section 2: Séries & Nouveautés TV -->
+          <div class="space-y-4">
+            <h3 class="font-heading font-bold text-lg text-white flex items-center gap-2">
+              <span>📺</span> <span>Séries & Nouveautés TV</span>
+            </h3>
+            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
+              <div 
+                v-for="item in recentSeries" 
+                :key="item.id"
+                @click="openMediaDetail(item)"
+                class="bg-cardBg border border-white/10 rounded-xl overflow-hidden cursor-pointer group hover:-translate-y-1.5 hover:border-white/30 transition-all duration-300 shadow-xl relative flex flex-col"
+              >
+                <div class="relative aspect-[2/3] bg-gray-900 overflow-hidden">
+                  <img :src="item.posterPath" :alt="item.title" @error="handleImgError($event, item.title)" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
+                  <div class="absolute top-2 left-2 flex gap-1">
+                    <span class="text-[10px] font-heading font-bold px-2 py-0.5 rounded bg-black/80 text-white">📺 Série</span>
+                    <span v-if="item.year" class="text-[10px] font-heading px-1.5 py-0.5 rounded bg-black/60 text-gray-300">{{ item.year }}</span>
+                  </div>
+                </div>
+                <div class="p-3 flex flex-col flex-1">
+                  <h4 class="font-heading font-bold text-sm text-white line-clamp-2 mb-2 leading-snug" :title="item.title">{{ item.title }}</h4>
+                  <div class="mt-auto pt-2 flex gap-1.5">
+                    <button @click.stop="saveItem(item, 'in_progress')" class="flex-1 text-[11px] font-heading font-bold py-1 bg-netflixRed hover:bg-netflixRedHover text-white rounded-lg transition-colors">+ En cours</button>
+                    <button @click.stop="saveItem(item, 'watchlist')" class="flex-1 text-[11px] font-heading font-bold py-1 bg-traktPurple hover:opacity-90 text-white rounded-lg transition-colors">+ À voir</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section 3: Nouveautés Animés (JP) -->
+          <div class="space-y-4">
+            <h3 class="font-heading font-bold text-lg text-white flex items-center gap-2">
+              <span>🇯🇵</span> <span>Nouveautés Animés Japonais</span>
+            </h3>
+            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
+              <div 
+                v-for="item in recentAnime" 
+                :key="item.id"
+                @click="openMediaDetail(item)"
+                class="bg-cardBg border border-white/10 rounded-xl overflow-hidden cursor-pointer group hover:-translate-y-1.5 hover:border-white/30 transition-all duration-300 shadow-xl relative flex flex-col"
+              >
+                <div class="relative aspect-[2/3] bg-gray-900 overflow-hidden">
+                  <img :src="item.posterPath" :alt="item.title" @error="handleImgError($event, item.title)" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
+                  <div class="absolute top-2 left-2 flex gap-1">
+                    <span class="text-[10px] font-heading font-bold px-2 py-0.5 rounded bg-purple-600/90 text-white">🇯🇵 Animé</span>
+                    <span v-if="item.year" class="text-[10px] font-heading px-1.5 py-0.5 rounded bg-black/60 text-gray-300">{{ item.year }}</span>
+                  </div>
+                </div>
+                <div class="p-3 flex flex-col flex-1">
+                  <h4 class="font-heading font-bold text-sm text-white line-clamp-2 mb-2 leading-snug" :title="item.title">{{ item.title }}</h4>
+                  <div class="mt-auto pt-2 flex gap-1.5">
+                    <button @click.stop="saveItem(item, 'in_progress')" class="flex-1 text-[11px] font-heading font-bold py-1 bg-netflixRed hover:bg-netflixRedHover text-white rounded-lg transition-colors">+ En cours</button>
+                    <button @click.stop="saveItem(item, 'watchlist')" class="flex-1 text-[11px] font-heading font-bold py-1 bg-traktPurple hover:opacity-90 text-white rounded-lg transition-colors">+ À voir</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section 4: Nouveaux K-Dramas (KR) -->
+          <div class="space-y-4">
+            <h3 class="font-heading font-bold text-lg text-white flex items-center gap-2">
+              <span>🇰🇷</span> <span>Nouveaux K-Dramas Coréens</span>
+            </h3>
+            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
+              <div 
+                v-for="item in recentKdrama" 
+                :key="item.id"
+                @click="openMediaDetail(item)"
+                class="bg-cardBg border border-white/10 rounded-xl overflow-hidden cursor-pointer group hover:-translate-y-1.5 hover:border-white/30 transition-all duration-300 shadow-xl relative flex flex-col"
+              >
+                <div class="relative aspect-[2/3] bg-gray-900 overflow-hidden">
+                  <img :src="item.posterPath" :alt="item.title" @error="handleImgError($event, item.title)" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
+                  <div class="absolute top-2 left-2 flex gap-1">
+                    <span class="text-[10px] font-heading font-bold px-2 py-0.5 rounded bg-pink-600/90 text-white">🇰🇷 K-Drama</span>
+                    <span v-if="item.year" class="text-[10px] font-heading px-1.5 py-0.5 rounded bg-black/60 text-gray-300">{{ item.year }}</span>
+                  </div>
+                </div>
+                <div class="p-3 flex flex-col flex-1">
+                  <h4 class="font-heading font-bold text-sm text-white line-clamp-2 mb-2 leading-snug" :title="item.title">{{ item.title }}</h4>
+                  <div class="mt-auto pt-2 flex gap-1.5">
+                    <button @click.stop="saveItem(item, 'in_progress')" class="flex-1 text-[11px] font-heading font-bold py-1 bg-netflixRed hover:bg-netflixRedHover text-white rounded-lg transition-colors">+ En cours</button>
+                    <button @click.stop="saveItem(item, 'watchlist')" class="flex-1 text-[11px] font-heading font-bold py-1 bg-traktPurple hover:opacity-90 text-white rounded-lg transition-colors">+ À voir</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
       <!-- ================= SEARCH TAB ================= -->
-      <div v-if="activeTab === 'search'" class="space-y-6">
+      <div v-if="activeTab === 'search'" class="space-y-6 animate-fadeIn">
         <div class="space-y-1">
           <h2 class="font-heading font-bold text-2xl md:text-3xl text-white">🔍 Rechercher sur SpeedSuivi</h2>
           <p class="text-gray-400 text-sm">Recherche globale tolérante via le proxy sécurisé SpeedSuivi.</p>
@@ -740,7 +884,15 @@
     <!-- Mobile Bottom Navigation Bar -->
     <nav class="md:hidden fixed bottom-0 left-0 right-0 z-50 glass-header border-t border-white/10 p-2 flex justify-around">
       <button 
-        @click="activeTab = 'in_progress'"
+        @click="navigateTo('home')"
+        :class="['flex flex-col items-center text-[10px] font-heading font-semibold transition-colors', activeTab === 'home' ? 'text-netflixRed' : 'text-gray-400']"
+      >
+        <span class="text-lg">🏠</span>
+        <span>Accueil</span>
+      </button>
+
+      <button 
+        @click="navigateTo('in_progress')"
         :class="['flex flex-col items-center text-[10px] font-heading font-semibold transition-colors relative', activeTab === 'in_progress' ? 'text-netflixRed' : 'text-gray-400']"
       >
         <span class="text-lg">🚀</span>
@@ -751,7 +903,7 @@
       </button>
 
       <button 
-        @click="activeTab = 'watchlist'"
+        @click="navigateTo('watchlist')"
         :class="['flex flex-col items-center text-[10px] font-heading font-semibold transition-colors', activeTab === 'watchlist' ? 'text-netflixRed' : 'text-gray-400']"
       >
         <span class="text-lg">📌</span>
@@ -759,7 +911,7 @@
       </button>
 
       <button 
-        @click="activeTab = 'completed'"
+        @click="navigateTo('completed')"
         :class="['flex flex-col items-center text-[10px] font-heading font-semibold transition-colors', activeTab === 'completed' ? 'text-netflixRed' : 'text-gray-400']"
       >
         <span class="text-lg">✅</span>
@@ -767,7 +919,7 @@
       </button>
 
       <button 
-        @click="activeTab = 'favorites'"
+        @click="navigateTo('favorites')"
         :class="['flex flex-col items-center text-[10px] font-heading font-semibold transition-colors relative', activeTab === 'favorites' ? 'text-netflixRed' : 'text-gray-400']"
       >
         <span class="text-lg">🔄</span>
@@ -778,7 +930,7 @@
       </button>
 
       <button 
-        @click="activeTab = 'search'"
+        @click="navigateTo('search')"
         :class="['flex flex-col items-center text-[10px] font-heading font-semibold transition-colors', activeTab === 'search' ? 'text-netflixRed' : 'text-gray-400']"
       >
         <span class="text-lg">🔍</span>
@@ -786,190 +938,221 @@
       </button>
     </nav>
 
-    <!-- ================= MEDIA DETAIL MODAL ================= -->
-    <div v-if="selectedMedia" class="fixed inset-0 z-[100] modal-backdrop flex items-center justify-center p-4">
-      <div class="bg-cardBg border border-white/10 rounded-2xl max-w-2xl w-full max-h-[88vh] overflow-y-auto shadow-2xl relative animate-fadeIn flex flex-col no-scrollbar">
-        
-        <!-- Close Button -->
+    <!-- ================= FULL PAGE MEDIA DETAIL VIEW ================= -->
+    <div v-if="selectedMedia" class="min-h-screen bg-darkBg text-white flex flex-col flex-1 pb-24 animate-fadeIn relative z-40">
+      
+      <!-- Sticky Top Back Bar -->
+      <div class="sticky top-4 left-4 md:top-6 md:left-8 z-50 px-4 md:px-8">
         <button 
-          @click="selectedMedia = null"
-          class="absolute top-4 right-4 z-20 w-9 h-9 rounded-full bg-black/60 hover:bg-netflixRed text-white text-xl flex items-center justify-center transition-colors shadow-lg"
-        >&times;</button>
-
-        <!-- Backdrop Header (~300px - 350px height) -->
-        <div 
-          class="h-[300px] md:h-[340px] bg-cover bg-center relative p-6 flex items-end shrink-0"
-          :style="{ backgroundImage: selectedMedia.backdropPath ? `linear-gradient(to bottom, rgba(11, 13, 18, 0.2) 0%, rgba(11, 13, 18, 0.7) 60%, rgba(20, 23, 33, 0.98) 100%), url('${selectedMedia.backdropPath}')` : 'none' }"
+          @click="closeDetailView"
+          class="inline-flex items-center gap-2 bg-black/80 hover:bg-netflixRed text-white text-xs md:text-sm font-heading font-bold px-4 py-2.5 rounded-full border border-white/20 shadow-2xl backdrop-blur-md transition-all active:scale-95 group"
         >
-          <div class="flex gap-4 md:gap-5 items-end transform translate-y-10 md:translate-y-12 w-full">
-            <img 
-              :src="selectedMedia.posterPath" 
-              :alt="selectedMedia.title" 
-              @error="handleImgError($event, selectedMedia.title)"
-              class="w-28 md:w-36 aspect-[2/3] object-cover rounded-xl border-2 border-white/20 shadow-2xl shrink-0 -mb-2" 
-            />
-            <div class="space-y-1.5 flex-1 min-w-0 pb-1">
-              <div class="flex flex-wrap gap-1.5 items-center">
-                <span 
-                  :class="['text-[11px] font-heading font-bold px-2 py-0.5 rounded shadow', selectedMedia.category === 'kdrama' ? 'bg-pink-600 text-white' : selectedMedia.category === 'anime' ? 'bg-purple-600 text-white' : 'bg-netflixRed text-white']"
-                >
-                  {{ getCategoryBadge(selectedMedia.category) }}
-                </span>
-                <span v-if="selectedMedia.year" class="bg-black/60 text-gray-300 text-[11px] font-heading px-2 py-0.5 rounded">
-                  {{ selectedMedia.year }}
-                </span>
-                <span v-if="selectedMedia.voteAverage" class="bg-amber-500/20 text-amber-400 text-[11px] font-heading font-bold px-2 py-0.5 rounded">
-                  ⭐ {{ selectedMedia.voteAverage }}/10
-                </span>
-                <button 
-                  @click="toggleFavorite(selectedMedia)"
-                  :class="['ml-auto text-xs font-heading font-bold px-3 py-1 rounded-full flex items-center gap-1 border transition-all active:scale-95 shadow', isFavoriteItem(selectedMedia.id) ? 'bg-netflixRed text-white border-netflixRed' : 'bg-white/10 hover:bg-white/20 text-gray-300 border-white/10']"
-                >
-                  <span>🔄</span>
-                  <span>{{ isFavoriteItem(selectedMedia.id) ? 'À revoir' : 'Marquer À revoir' }}</span>
-                </button>
-              </div>
-              <h2 class="font-heading font-extrabold text-xl md:text-2xl text-white whitespace-normal break-words leading-tight" :title="selectedMedia.title">{{ selectedMedia.title }}</h2>
-              <p v-if="selectedMedia.originalTitle && selectedMedia.originalTitle !== selectedMedia.title" class="text-xs text-gray-400 italic whitespace-normal break-words">
-                {{ selectedMedia.originalTitle }}
-              </p>
+          <span class="transform group-hover:-translate-x-1 transition-transform">←</span>
+          <span>Retour à la navigation</span>
+        </button>
+      </div>
+
+      <!-- Hero Backdrop Header (~400px - 480px) -->
+      <div 
+        class="h-[380px] md:h-[480px] bg-cover bg-center relative flex items-end p-6 md:p-12 shrink-0 border-b border-white/10 -mt-14"
+        :style="{ backgroundImage: selectedMedia.backdropPath ? `linear-gradient(to bottom, rgba(11, 13, 18, 0.3) 0%, rgba(11, 13, 18, 0.8) 65%, rgba(11, 13, 18, 1) 100%), url('${selectedMedia.backdropPath}')` : 'none' }"
+      >
+        <div class="max-w-6xl mx-auto w-full flex flex-col md:flex-row gap-6 md:gap-8 items-end transform translate-y-16 md:translate-y-20 z-10">
+          <img 
+            :src="selectedMedia.posterPath" 
+            :alt="selectedMedia.title" 
+            @error="handleImgError($event, selectedMedia.title)"
+            class="w-36 md:w-52 aspect-[2/3] object-cover rounded-2xl border-4 border-white/20 shadow-2xl shrink-0" 
+          />
+          <div class="space-y-2 flex-1 min-w-0 pb-2">
+            <div class="flex flex-wrap gap-2 items-center">
+              <span :class="['text-xs font-heading font-bold px-3 py-1 rounded-full shadow-lg', selectedMedia.category === 'kdrama' ? 'bg-pink-600 text-white' : selectedMedia.category === 'anime' ? 'bg-purple-600 text-white' : 'bg-netflixRed text-white']">
+                {{ getCategoryBadge(selectedMedia.category) }}
+              </span>
+              <span v-if="selectedMedia.year" class="bg-black/60 backdrop-blur-md text-gray-300 text-xs font-heading px-3 py-1 rounded-full border border-white/10">
+                {{ selectedMedia.year }}
+              </span>
+              <span v-if="selectedMedia.voteAverage" class="bg-amber-500/20 border border-amber-500/40 text-amber-400 text-xs font-heading font-bold px-3 py-1 rounded-full">
+                ⭐ {{ selectedMedia.voteAverage }}/10
+              </span>
+              <button 
+                @click="toggleFavorite(selectedMedia)"
+                :class="['ml-auto text-xs font-heading font-bold px-3.5 py-1.5 rounded-full flex items-center gap-1.5 border transition-all active:scale-95 shadow-lg backdrop-blur-md', isFavoriteItem(selectedMedia.id) ? 'bg-netflixRed text-white border-netflixRed' : 'bg-white/10 hover:bg-white/20 text-gray-300 border-white/10']"
+              >
+                <span>🔄</span>
+                <span>{{ isFavoriteItem(selectedMedia.id) ? 'À revoir' : 'Marquer À revoir' }}</span>
+              </button>
             </div>
+            <h1 class="font-heading font-extrabold text-2xl md:text-4xl text-white whitespace-normal break-words leading-tight drop-shadow-md">
+              {{ selectedMedia.title }}
+            </h1>
+            <p v-if="selectedMedia.originalTitle && selectedMedia.originalTitle !== selectedMedia.title" class="text-sm text-gray-400 italic">
+              {{ selectedMedia.originalTitle }}
+            </p>
           </div>
         </div>
+      </div>
 
-        <!-- Modal Body Content (Padding top adjusted for overlapping poster) -->
-        <div class="p-6 pt-14 md:pt-16 space-y-6 flex-1">
+      <!-- Main Detail Content Area -->
+      <div class="max-w-6xl mx-auto w-full px-4 md:px-8 pt-24 md:pt-28 space-y-8 flex-1">
+        
+        <!-- Stream Platforms Section in France -->
+        <div class="space-y-3 bg-cardBg/60 p-5 rounded-2xl border border-white/10 backdrop-blur-md shadow-xl">
+          <h4 class="text-xs font-heading font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
+            <span>📺</span> <span>Disponible en France en streaming sur :</span>
+          </h4>
+          <div v-if="selectedMedia.providers && selectedMedia.providers.length > 0" class="flex flex-wrap gap-2.5 pt-1">
+            <div 
+              v-for="prov in selectedMedia.providers" 
+              :key="prov.id"
+              class="flex items-center gap-2.5 bg-surfaceBg border border-white/10 px-3.5 py-2 rounded-xl text-xs font-heading font-semibold text-white shadow"
+            >
+              <img v-if="prov.logo" :src="prov.logo" :alt="prov.name" class="w-6 h-6 rounded-md object-cover" />
+              <span>{{ prov.name }}</span>
+            </div>
+          </div>
+          <p v-else class="text-xs text-gray-500 italic">Recherche des plateformes de streaming en cours ou indisponible en abonnement direct en France.</p>
+        </div>
+
+        <!-- Synopsis Section -->
+        <div class="space-y-3 bg-cardBg/60 p-6 rounded-2xl border border-white/10 shadow-xl">
+          <h4 class="text-xs font-heading font-bold text-gray-400 uppercase tracking-wider">Synopsis</h4>
+          <p class="text-base text-gray-300 leading-relaxed font-body">{{ selectedMedia.overview || 'Aucun synopsis disponible pour ce titre.' }}</p>
+        </div>
+
+        <!-- Interactive User Tracker Module -->
+        <div class="bg-cardBg p-6 rounded-2xl border border-white/10 space-y-6 shadow-2xl">
+          <h4 class="text-sm font-heading font-bold text-white uppercase tracking-wider flex items-center gap-2">
+            <span>📊</span> <span>Mon Suivi & Avancement</span>
+          </h4>
           
-          <!-- Stream Platforms Section in France -->
-          <div class="space-y-2">
-            <h4 class="text-xs font-heading font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
-              <span>📺</span> <span>Disponible en France sur :</span>
-            </h4>
-            <div v-if="selectedMedia.providers && selectedMedia.providers.length > 0" class="flex flex-wrap gap-2 pt-1">
-              <div 
-                v-for="prov in selectedMedia.providers" 
-                :key="prov.id"
-                class="flex items-center gap-2 bg-surfaceBg border border-white/10 px-3 py-1.5 rounded-lg text-xs font-heading font-semibold text-white shadow"
-              >
-                <img v-if="prov.logo" :src="prov.logo" :alt="prov.name" class="w-5 h-5 rounded object-cover" />
-                <span>{{ prov.name }}</span>
-              </div>
-            </div>
-            <p v-else class="text-xs text-gray-500 italic">Recherche des plateformes de streaming en cours ou indisponible en abonnement direct en France.</p>
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <button 
+              @click="modalStatus = 'in_progress'"
+              :class="['py-3 px-4 text-xs font-heading font-bold rounded-xl border transition-all flex items-center justify-center gap-2', modalStatus === 'in_progress' ? 'bg-netflixRed border-netflixRed text-white shadow-lg shadow-netflixRed/30' : 'bg-surfaceBg border-white/10 text-gray-400 hover:text-white hover:bg-white/5']"
+            >🚀 En cours</button>
+            <button 
+              @click="modalStatus = 'watchlist'"
+              :class="['py-3 px-4 text-xs font-heading font-bold rounded-xl border transition-all flex items-center justify-center gap-2', modalStatus === 'watchlist' ? 'bg-traktPurple border-traktPurple text-white shadow-lg shadow-traktPurple/30' : 'bg-surfaceBg border-white/10 text-gray-400 hover:text-white hover:bg-white/5']"
+            >📌 À voir</button>
+            <button 
+              @click="modalStatus = 'completed'"
+              :class="['py-3 px-4 text-xs font-heading font-bold rounded-xl border transition-all flex items-center justify-center gap-2', modalStatus === 'completed' ? 'bg-successGreen border-successGreen text-black font-bold shadow-lg shadow-successGreen/30' : 'bg-surfaceBg border-white/10 text-gray-400 hover:text-white hover:bg-white/5']"
+            >✅ Terminé</button>
+            <button 
+              @click="modalStatus = 'favorites'"
+              :class="['py-3 px-4 text-xs font-heading font-bold rounded-xl border transition-all flex items-center justify-center gap-2', modalStatus === 'favorites' ? 'bg-netflixRed border-netflixRed text-white shadow-lg shadow-netflixRed/30' : 'bg-surfaceBg border-white/10 text-gray-400 hover:text-white hover:bg-white/5']"
+            >🔄 À revoir</button>
           </div>
 
-          <div class="space-y-2">
-            <h4 class="text-xs font-heading font-bold text-gray-400 uppercase tracking-wider">Synopsis</h4>
-            <p class="text-sm text-gray-300 leading-relaxed">{{ selectedMedia.overview || 'Aucun synopsis disponible.' }}</p>
-          </div>
-
-          <!-- Status Editor -->
-          <div class="bg-surfaceBg p-4 rounded-xl border border-white/10 space-y-4">
-            <h4 class="text-xs font-heading font-bold text-gray-400 uppercase tracking-wider">Statut de visionnage</h4>
-            
-            <div class="flex gap-2">
-              <button 
-                @click="modalStatus = 'in_progress'"
-                :class="['flex-1 py-2 text-xs font-heading font-bold rounded-lg border transition-all', modalStatus === 'in_progress' ? 'bg-netflixRed border-netflixRed text-white' : 'bg-white/5 border-white/10 text-gray-400 hover:text-white']"
-              >🚀 En cours</button>
-              <button 
-                @click="modalStatus = 'watchlist'"
-                :class="['flex-1 py-2 text-xs font-heading font-bold rounded-lg border transition-all', modalStatus === 'watchlist' ? 'bg-traktPurple border-traktPurple text-white' : 'bg-white/5 border-white/10 text-gray-400 hover:text-white']"
-              >📌 À voir</button>
-              <button 
-                @click="modalStatus = 'completed'"
-                :class="['flex-1 py-2 text-xs font-heading font-bold rounded-lg border transition-all', modalStatus === 'completed' ? 'bg-successGreen border-successGreen text-black font-bold' : 'bg-white/5 border-white/10 text-gray-400 hover:text-white']"
-              >✅ Terminé</button>
+          <!-- Season / Episode Number Inputs -->
+          <div v-if="selectedMedia.mediaType !== 'movie'" class="flex flex-wrap gap-6 pt-4 border-t border-white/10 items-center justify-between">
+            <div class="flex items-center gap-3">
+              <label class="text-xs font-heading font-bold text-gray-300 uppercase">Saison :</label>
+              <input 
+                type="number" 
+                min="1" 
+                v-model.number="modalSeason" 
+                class="w-20 bg-surfaceBg border border-white/15 rounded-xl px-3 py-2 text-sm font-bold text-white text-center focus:outline-none focus:border-netflixRed"
+              />
             </div>
 
-            <!-- Season / Episode Number Inputs -->
-            <div v-if="selectedMedia.mediaType !== 'movie'" class="flex flex-wrap gap-4 pt-2 border-t border-white/10 items-center">
-              <div class="flex items-center gap-2">
-                <label class="text-xs font-semibold text-gray-300">Saison :</label>
-                <input 
-                  type="number" 
-                  min="1" 
-                  v-model.number="modalSeason" 
-                  class="w-16 bg-cardBg border border-white/10 rounded-md px-2 py-1 text-sm font-bold text-white focus:outline-none focus:border-netflixRed"
-                />
-              </div>
-
-              <div class="flex items-center gap-2">
-                <label class="text-xs font-semibold text-gray-300">Épisode vu :</label>
+            <div class="flex items-center gap-3">
+              <label class="text-xs font-heading font-bold text-gray-300 uppercase">Épisode vu :</label>
+              <div class="flex items-center gap-1.5">
+                <button 
+                  @click="modalEpisode = Math.max(0, modalEpisode - 1)"
+                  class="w-9 h-9 rounded-lg bg-surfaceBg border border-white/15 hover:bg-netflixRed text-white text-lg font-bold flex items-center justify-center transition-colors"
+                >-</button>
                 <input 
                   type="number" 
                   min="0" 
                   :max="selectedMedia.totalEpisodes || 999" 
                   v-model.number="modalEpisode" 
-                  class="w-20 bg-cardBg border border-white/10 rounded-md px-2 py-1 text-sm font-bold text-white focus:outline-none focus:border-netflixRed"
+                  class="w-20 bg-surfaceBg border border-white/15 rounded-xl px-2 py-2 text-sm font-bold text-white text-center focus:outline-none focus:border-netflixRed"
                 />
-                <span class="text-xs text-gray-400 font-semibold">/ {{ selectedMedia.totalEpisodes || 12 }} ép.</span>
+                <button 
+                  @click="modalEpisode = Math.min(selectedMedia.totalEpisodes || 999, modalEpisode + 1)"
+                  class="w-9 h-9 rounded-lg bg-surfaceBg border border-white/15 hover:bg-netflixRed text-white text-lg font-bold flex items-center justify-center transition-colors"
+                >+</button>
               </div>
+              <span class="text-xs text-gray-400 font-semibold">/ {{ selectedMedia.totalEpisodes || 12 }} épisodes</span>
             </div>
           </div>
 
-          <!-- Actions -->
-          <div class="flex justify-between items-center pt-2">
+          <!-- Bottom Action Buttons -->
+          <div class="flex flex-wrap justify-between items-center pt-4 border-t border-white/10 gap-4">
             <button 
               v-if="isItemSaved(selectedMedia.id)"
               @click="removeFromLibrary(selectedMedia.id)"
-              class="text-xs font-heading font-semibold text-red-400 hover:text-red-300 px-3 py-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 transition-all"
+              class="text-xs font-heading font-semibold text-red-400 hover:text-red-300 px-4 py-2.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 transition-all flex items-center gap-1.5"
             >
-              🗑️ Retirer de ma liste
+              <span>🗑️</span> <span>Retirer de ma bibliothèque</span>
             </button>
-            <div class="ml-auto flex gap-2">
+            <div class="ml-auto flex gap-3">
               <button 
-                @click="selectedMedia = null"
-                class="text-xs font-heading font-semibold px-4 py-2 rounded-lg border border-white/10 text-gray-300 hover:bg-white/10"
+                @click="closeDetailView"
+                class="text-xs font-heading font-semibold px-5 py-2.5 rounded-xl border border-white/10 text-gray-300 hover:bg-white/10"
               >
                 Annuler
               </button>
               <button 
                 @click="saveModalChanges"
-                class="text-xs font-heading font-bold px-5 py-2 rounded-lg bg-netflixRed hover:bg-netflixRedHover text-white shadow-lg shadow-netflixRed/30 transition-all"
+                class="text-xs font-heading font-bold px-6 py-2.5 rounded-xl bg-netflixRed hover:bg-netflixRedHover text-white shadow-lg shadow-netflixRed/30 transition-all flex items-center gap-2"
               >
-                💾 Enregistrer
+                <span>💾</span> <span>Enregistrer les modifications</span>
               </button>
             </div>
           </div>
+        </div>
 
-          <!-- TMDB Recommendations & Similar Titles Carousel (STRICTLY BELOW ACTION BUTTONS) -->
-          <div class="space-y-3 pt-6 border-t border-white/10">
-            <h4 class="text-xs font-heading font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
-              <span>💡</span> <span>RECOMMANDATIONS & TITRES SIMILAIRES :</span>
-            </h4>
+        <!-- TMDB Recommendations & Similar Titles Carousel -->
+        <div class="space-y-4 pt-6 border-t border-white/10">
+          <h3 class="text-sm font-heading font-bold text-white uppercase tracking-wider flex items-center gap-2">
+            <span>💡</span> <span>Recommandations & Titres Similaires</span>
+          </h3>
 
-            <div v-if="isLoadingRecommendations" class="flex justify-center py-4">
-              <div class="w-6 h-6 border-2 border-white/20 border-t-netflixRed rounded-full animate-spin"></div>
-            </div>
-
-            <div v-else-if="modalRecommendations.length > 0" class="flex gap-3.5 overflow-x-auto pb-3 pt-1 px-1 scroll-smooth no-scrollbar">
-              <div 
-                v-for="rec in modalRecommendations" 
-                :key="rec.id"
-                @click="openModal(rec)"
-                class="flex-none w-28 group cursor-pointer space-y-1.5"
-              >
-                <div class="aspect-[2/3] bg-gray-900 rounded-lg overflow-hidden border border-white/10 relative group-hover:border-netflixRed group-hover:scale-105 transition-all shadow-md">
-                  <img 
-                    :src="rec.posterPath" 
-                    :alt="rec.title" 
-                    @error="handleImgError($event, rec.title)"
-                    class="w-full h-full object-cover" 
-                  />
-                </div>
-                <p class="text-[11px] font-heading font-semibold text-gray-300 line-clamp-2 leading-snug group-hover:text-netflixRed transition-colors" :title="rec.title">
-                  {{ rec.title }}
-                </p>
-              </div>
-            </div>
-
-            <p v-else class="text-xs text-gray-500 italic">Aucune recommandation similaire trouvée.</p>
+          <div v-if="isLoadingRecommendations" class="flex justify-center py-8">
+            <div class="w-8 h-8 border-4 border-white/20 border-t-netflixRed rounded-full animate-spin"></div>
           </div>
 
+          <div v-else-if="modalRecommendations.length > 0" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
+            <div 
+              v-for="rec in modalRecommendations" 
+              :key="rec.id"
+              @click="openMediaDetail(rec)"
+              class="bg-cardBg border border-white/10 rounded-xl overflow-hidden cursor-pointer hover:-translate-y-1.5 transition-all group shadow-lg flex flex-col"
+            >
+              <div class="aspect-[2/3] bg-gray-900 overflow-hidden relative">
+                <img :src="rec.posterPath" :alt="rec.title" @error="handleImgError($event, rec.title)" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                <div class="absolute top-2 left-2">
+                  <span class="text-[10px] font-heading font-bold px-2 py-0.5 rounded bg-black/80 text-white">
+                    {{ getCategoryBadge(rec.category) }}
+                  </span>
+                </div>
+              </div>
+              <div class="p-2.5 flex flex-col flex-1">
+                <h4 class="font-heading font-bold text-xs text-white line-clamp-1 group-hover:text-netflixRed transition-colors" :title="rec.title">{{ rec.title }}</h4>
+                <span v-if="rec.year" class="text-[10px] text-gray-400 mt-auto pt-1">{{ rec.year }}</span>
+              </div>
+            </div>
+          </div>
+          <p v-else class="text-xs text-gray-500 italic">Aucune recommandation similaire trouvée.</p>
         </div>
+
       </div>
+
     </div>
+
+    <!-- Floating Back to Top Button -->
+    <button 
+      v-if="showBackToTop"
+      @click="scrollToTop"
+      class="fixed bottom-20 md:bottom-8 right-6 z-40 bg-netflixRed hover:bg-netflixRedHover text-white p-3.5 rounded-full shadow-2xl transition-all duration-300 transform hover:scale-110 active:scale-95 border border-white/20"
+      title="Retour en haut de page"
+    >
+      <span class="text-base">⬆️</span>
+    </button>
 
     <!-- Toast Notifications Container -->
     <div class="fixed bottom-6 right-6 z-[200] flex flex-col gap-2 pointer-events-none">
@@ -1009,7 +1192,7 @@
 
     createApp({
       setup() {
-        const activeTab = ref('in_progress');
+        const activeTab = ref('home');
         const activeFilter = ref('all');
         const activeProviderFilter = ref('all');
         const activeGenreFilter = ref('all');
@@ -1025,9 +1208,16 @@
         const trendingPage = ref(1);
         const totalTrendingPages = ref(1);
 
+        const recentMovies = ref([]);
+        const recentSeries = ref([]);
+        const recentAnime = ref([]);
+        const recentKdrama = ref([]);
+        const isLoadingHome = ref(false);
+
         const isSearching = ref(false);
         const isLoadingMore = ref(false);
         const searchInputRef = ref(null);
+        const showBackToTop = ref(false);
 
         const collection = ref([]);
         const selectedMedia = ref(null);
@@ -1113,15 +1303,6 @@
         // Synchronous initial load of saved collection
         loadCollection();
 
-        // Reactive Deep Watcher for automatic synchronous persistence of all progress changes
-        watch(collection, (newVal) => {
-          try {
-            localStorage.setItem('media_tracker_v2', JSON.stringify(newVal));
-          } catch (e) {
-            console.error('Error in deep collection watcher:', e);
-          }
-        }, { deep: true });
-
         // Category detection
         const detectCategory = (item) => {
           if (item.media_type === 'movie' || (!item.media_type && item.title && !item.name)) {
@@ -1174,6 +1355,138 @@
             providers: [],
             providersLoaded: false
           };
+        };
+
+        // Navigation & Hash Router
+        const navigateTo = (tabName) => {
+          selectedMedia.value = null;
+          activeTab.value = tabName;
+          window.location.hash = `#${tabName}`;
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        };
+
+        const updateRouteFromHash = () => {
+          const hash = window.location.hash || '#home';
+          if (hash.startsWith('#media/')) {
+            const mediaId = hash.replace('#media/', '');
+            const foundInCol = collection.value.find(i => i.id === mediaId);
+            if (foundInCol) {
+              openMediaDetail(foundInCol, false);
+            } else if (!selectedMedia.value || selectedMedia.value.id !== mediaId) {
+              fetchMediaByIdAndOpen(mediaId);
+            }
+          } else {
+            selectedMedia.value = null;
+            const tabName = hash.replace('#', '') || 'home';
+            if (['home', 'in_progress', 'watchlist', 'completed', 'favorites', 'search'].includes(tabName)) {
+              activeTab.value = tabName;
+            } else {
+              activeTab.value = 'home';
+            }
+          }
+        };
+
+        const openMediaDetail = async (item, updateHash = true) => {
+          selectedMedia.value = item;
+          modalStatus.value = item.status || 'in_progress';
+          modalSeason.value = item.currentSeason || 1;
+          modalEpisode.value = item.currentEpisode || 0;
+          
+          if (updateHash) {
+            window.location.hash = `#media/${item.id}`;
+          }
+
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+
+          enrichWatchProviders(item);
+          fetchRecommendationsForMedia(item);
+        };
+
+        const closeDetailView = () => {
+          selectedMedia.value = null;
+          if (window.location.hash.startsWith('#media/')) {
+            window.history.back();
+          }
+        };
+
+        const fetchMediaByIdAndOpen = async (mediaId) => {
+          try {
+            const [type, tmdbId] = mediaId.split('_');
+            if (!tmdbId) return;
+            const typeUrl = (type === 'movie' || type === 'film') ? 'movie' : 'tv';
+            const res = await fetch(`${BASE_URL}/${typeUrl}/${tmdbId}?language=fr-FR`);
+            const raw = await res.json();
+            if (raw && raw.id) {
+              const formatted = formatItem({ ...raw, media_type: typeUrl });
+              openMediaDetail(formatted, false);
+            }
+          } catch (e) {
+            console.error('Error fetching media by hash id:', e);
+          }
+        };
+
+        const fetchRecommendationsForMedia = async (activeItem) => {
+          modalRecommendations.value = [];
+          isLoadingRecommendations.value = true;
+          try {
+            const type = activeItem.mediaType === 'movie' ? 'movie' : 'tv';
+            let recUrl = `${BASE_URL}/${type}/${activeItem.tmdbId}/recommendations?language=fr-FR`;
+            let recRes = await fetch(recUrl);
+            let recData = await recRes.json();
+
+            let recList = (recData.results || []).map(raw => formatItem({ ...raw, media_type: type }));
+
+            if (recList.length < 4) {
+              const simUrl = `${BASE_URL}/${type}/${activeItem.tmdbId}/similar?language=fr-FR`;
+              const simRes = await fetch(simUrl);
+              const simData = await simRes.json();
+              const simList = (simData.results || []).map(raw => formatItem({ ...raw, media_type: type }));
+              const seenIds = new Set(recList.map(r => r.id));
+              simList.forEach(s => {
+                if (!seenIds.has(s.id)) {
+                  seenIds.add(s.id);
+                  recList.push(s);
+                }
+              });
+            }
+
+            modalRecommendations.value = recList.slice(0, 10);
+          } catch (e) {
+            console.error('Error fetching recommendations:', e);
+            modalRecommendations.value = [];
+          } finally {
+            isLoadingRecommendations.value = false;
+          }
+        };
+
+        // Home Page releases fetcher
+        const fetchRecentReleases = async () => {
+          isLoadingHome.value = true;
+          try {
+            const today = new Date().toISOString().slice(0, 10);
+            const movieUrl = `${BASE_URL}/discover/movie?language=fr-FR&sort_by=primary_release_date.desc&primary_release_date.lte=${today}&vote_count.gte=3&page=1`;
+            const tvUrl = `${BASE_URL}/discover/tv?language=fr-FR&sort_by=first_air_date.desc&first_air_date.lte=${today}&vote_count.gte=3&page=1`;
+            const animeUrl = `${BASE_URL}/discover/tv?with_genres=16&with_origin_country=JP&language=fr-FR&sort_by=first_air_date.desc&first_air_date.lte=${today}&page=1`;
+            const kdramaUrl = `${BASE_URL}/discover/tv?with_origin_country=KR&language=fr-FR&sort_by=first_air_date.desc&first_air_date.lte=${today}&page=1`;
+
+            const [mRes, tRes, aRes, kRes] = await Promise.all([
+              fetch(movieUrl).then(r => r.ok ? r.json() : { results: [] }).catch(() => ({ results: [] })),
+              fetch(tvUrl).then(r => r.ok ? r.json() : { results: [] }).catch(() => ({ results: [] })),
+              fetch(animeUrl).then(r => r.ok ? r.json() : { results: [] }).catch(() => ({ results: [] })),
+              fetch(kdramaUrl).then(r => r.ok ? r.json() : { results: [] }).catch(() => ({ results: [] }))
+            ]);
+
+            recentMovies.value = (mRes.results || []).filter(i => i.poster_path).slice(0, 10).map(i => formatItem({ ...i, media_type: 'movie' }));
+            recentSeries.value = (tRes.results || []).filter(i => i.poster_path).slice(0, 10).map(i => formatItem({ ...i, media_type: 'tv' }));
+            recentAnime.value = (aRes.results || []).filter(i => i.poster_path).slice(0, 10).map(i => formatItem({ ...i, media_type: 'tv' }));
+            recentKdrama.value = (kRes.results || []).filter(i => i.poster_path).slice(0, 10).map(i => formatItem({ ...i, media_type: 'tv' }));
+
+            [...recentMovies.value, ...recentSeries.value, ...recentAnime.value, ...recentKdrama.value].forEach(item => enrichWatchProviders(item));
+          } catch (e) {
+            console.error('Error fetching home releases:', e);
+          } finally {
+            isLoadingHome.value = false;
+          }
         };
 
         // Async Watch Providers fetcher for results (France region)
@@ -1388,7 +1701,6 @@
             } else {
               // Default trending items
               const url = `${BASE_URL}/trending/all/week?language=fr-FR&page=${page}`;
-              console.log('TMDB Trending URL:', url);
               const res = await fetch(url);
               const data = await res.json();
               totalTrendingPages.value = data.total_pages || 1;
@@ -1405,9 +1717,6 @@
               items.forEach(item => enrichWatchProviders(item));
               return;
             }
-
-            if (movieUrl) console.log('TMDB Discover Movie URL:', movieUrl);
-            if (tvUrl) console.log('TMDB Discover TV URL:', tvUrl);
 
             const fetches = [];
             if (movieUrl) fetches.push(fetch(movieUrl).then(r => r.ok ? r.json() : { results: [], total_pages: 1 }).catch(() => ({ results: [], total_pages: 1 })));
@@ -1444,15 +1753,19 @@
           }
         };
 
-        // Window Scroll listener for Infinite Scroll
-        const handleScroll = () => {
-          if (activeTab.value !== 'search') return;
-          const scrollPosition = window.innerHeight + window.scrollY;
-          const threshold = document.body.offsetHeight - 500;
-
-          if (scrollPosition >= threshold) {
-            loadNextPage();
+        const handleScrollListeners = () => {
+          showBackToTop.value = window.scrollY >= 300;
+          if (activeTab.value === 'search') {
+            const scrollPosition = window.innerHeight + window.scrollY;
+            const threshold = document.body.offsetHeight - 500;
+            if (scrollPosition >= threshold) {
+              loadNextPage();
+            }
           }
+        };
+
+        const scrollToTop = () => {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
         };
 
         const onSelectCategoryFilter = (catId) => {
@@ -1593,76 +1906,13 @@
           }
         };
 
-        // Open Modal & Fetch Recommendations / Similar Titles via Nginx Proxy
-        const openModal = async (activeItem) => {
-          selectedMedia.value = activeItem;
-          modalStatus.value = activeItem.status || 'in_progress';
-          modalSeason.value = activeItem.currentSeason || 1;
-          modalEpisode.value = activeItem.currentEpisode || (activeItem.mediaType === 'movie' ? 0 : 0);
-          
-          modalRecommendations.value = [];
-          isLoadingRecommendations.value = true;
-
-          // Fetch watch providers for modal item
-          await enrichWatchProviders(activeItem);
-
-          // Fetch full episode details if needed
-          if (!activeItem.totalEpisodes || activeItem.totalEpisodes === 12) {
-            try {
-              const type = activeItem.mediaType === 'movie' ? 'movie' : 'tv';
-              const res = await fetch(`${BASE_URL}/${type}/${activeItem.tmdbId}?language=fr-FR`);
-              const data = await res.json();
-              if (data.number_of_episodes) {
-                selectedMedia.value.totalEpisodes = data.number_of_episodes;
-                selectedMedia.value.totalSeasons = data.number_of_seasons || 1;
-              }
-            } catch (e) {
-              console.error(e);
-            }
-          }
-
-          // Fetch Recommendations & Similar Titles via Nginx Proxy
-          try {
-            const type = activeItem.mediaType === 'movie' ? 'movie' : 'tv';
-            let recUrl = `${BASE_URL}/${type}/${activeItem.tmdbId}/recommendations?language=fr-FR`;
-            let recRes = await fetch(recUrl);
-            let recData = await recRes.json();
-
-            let recList = (recData.results || []).map(raw => formatItem({ ...raw, media_type: type }));
-
-            // Fallback to /similar if recommendations has fewer than 4 items
-            if (recList.length < 4) {
-              const simUrl = `${BASE_URL}/${type}/${activeItem.tmdbId}/similar?language=fr-FR`;
-              const simRes = await fetch(simUrl);
-              const simData = await simRes.json();
-              const simList = (simData.results || []).map(raw => formatItem({ ...raw, media_type: type }));
-              
-              // Merge lists avoiding duplicates
-              const seenIds = new Set(recList.map(r => r.id));
-              simList.forEach(s => {
-                if (!seenIds.has(s.id)) {
-                  seenIds.add(s.id);
-                  recList.push(s);
-                }
-              });
-            }
-
-            modalRecommendations.value = recList.slice(0, 10);
-          } catch (e) {
-            console.error('Error fetching recommendations:', e);
-            modalRecommendations.value = [];
-          } finally {
-            isLoadingRecommendations.value = false;
-          }
-        };
-
         const saveModalChanges = () => {
           if (!selectedMedia.value) return;
           saveItem(selectedMedia.value, modalStatus.value, {
             currentSeason: modalSeason.value,
             currentEpisode: modalEpisode.value
           });
-          selectedMedia.value = null;
+          closeDetailView();
         };
 
         const getProgressPercent = (item) => {
@@ -1795,12 +2045,16 @@
 
         onMounted(() => {
           loadCollection();
+          fetchRecentReleases();
           fetchDiscoveryContent(1);
-          window.addEventListener('scroll', handleScroll);
+          updateRouteFromHash();
+          window.addEventListener('hashchange', updateRouteFromHash);
+          window.addEventListener('scroll', handleScrollListeners);
         });
 
         onUnmounted(() => {
-          window.removeEventListener('scroll', handleScroll);
+          window.removeEventListener('hashchange', updateRouteFromHash);
+          window.removeEventListener('scroll', handleScrollListeners);
         });
 
         return {
@@ -1818,12 +2072,15 @@
           searchPage,
           totalSearchPages,
           totalSearchResults,
-          trendingResults,
-          trendingPage,
-          totalTrendingPages,
+          recentMovies,
+          recentSeries,
+          recentAnime,
+          recentKdrama,
+          isLoadingHome,
           isSearching,
           isLoadingMore,
           searchInputRef,
+          showBackToTop,
           collection,
           selectedMedia,
           modalStatus,
@@ -1841,6 +2098,12 @@
           filteredSearchResults,
           filteredTrendingResults,
 
+          navigateTo,
+          openMediaDetail,
+          openModal: openMediaDetail,
+          closeDetailView,
+          scrollToTop,
+
           onSearchInput,
           loadNextPage,
           onSelectCategoryFilter,
@@ -1855,7 +2118,6 @@
           changeEpisode,
           changeStatus,
           removeFromLibrary,
-          openModal,
           saveModalChanges,
           getProgressPercent,
           getCategoryBadge,
