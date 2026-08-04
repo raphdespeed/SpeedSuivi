@@ -7,8 +7,7 @@
 const CLIENT_ID = '603945258667-0a9970mtho016qrg3tpv5vqcgupsaqk3.apps.googleusercontent.com';
 const SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
 const FILE_NAME = 'speedsuivi_data.json';
-const TOKEN_KEY = 'speedsuivi_gdrive_token';
-const EXPIRY_KEY = 'speedsuivi_gdrive_expiry';
+const TOKEN_INFO_KEY = 'gdrive_token_info';
 const USER_KEY = 'speedsuivi_gdrive_user';
 
 let tokenClient = null;
@@ -24,6 +23,24 @@ export const driveState = {
   lastSyncTime: null,
   error: null
 };
+
+/**
+ * Save active token info into localStorage for persistent auto-login
+ */
+function saveTokenInfo(token, expiresInSeconds) {
+  accessToken = token;
+  const expiresIn = expiresInSeconds || 3590;
+  tokenExpiryTime = Date.now() + (expiresIn - 60) * 1000;
+
+  try {
+    localStorage.setItem(TOKEN_INFO_KEY, JSON.stringify({
+      token: accessToken,
+      expiry: tokenExpiryTime
+    }));
+  } catch (e) {
+    console.error('Error storing gdrive_token_info:', e);
+  }
+}
 
 /**
  * Ensure token is still valid before calling Drive APIs.
@@ -48,8 +65,8 @@ async function ensureValidToken() {
           } else {
             console.warn('Silent token refresh expired. Re-auth required.');
             accessToken = null;
-            sessionStorage.removeItem(TOKEN_KEY);
-            sessionStorage.removeItem(EXPIRY_KEY);
+            tokenExpiryTime = 0;
+            localStorage.removeItem(TOKEN_INFO_KEY);
             driveState.isConnected = false;
             resolve(false);
           }
@@ -67,30 +84,42 @@ async function ensureValidToken() {
 
 /**
  * Initialize Google Token Client via Google Identity Services (GIS)
+ * Handles localStorage persistence and silent background re-auth.
  */
 export function initDriveSync(onStatusChange, onDataReceived) {
-  // Restore cached session token and expiry if available
-  const cachedToken = sessionStorage.getItem(TOKEN_KEY);
-  const cachedExpiry = sessionStorage.getItem(EXPIRY_KEY);
+  // 1. Check persistent localStorage token info
   const cachedUser = localStorage.getItem(USER_KEY);
-
   if (cachedUser) {
     try {
       driveState.user = JSON.parse(cachedUser);
     } catch (e) {}
   }
 
-  if (cachedToken) {
-    accessToken = cachedToken;
-    tokenExpiryTime = parseInt(cachedExpiry, 10) || 0;
-    
-    // Check if token expired
-    if (Date.now() < tokenExpiryTime) {
-      driveState.isConnected = true;
-      if (onStatusChange) onStatusChange(driveState);
+  const cachedTokenInfoStr = localStorage.getItem(TOKEN_INFO_KEY);
+  let isCachedTokenValid = false;
+
+  if (cachedTokenInfoStr) {
+    try {
+      const tokenInfo = JSON.parse(cachedTokenInfoStr);
+      if (tokenInfo && tokenInfo.token && tokenInfo.expiry) {
+        accessToken = tokenInfo.token;
+        tokenExpiryTime = parseInt(tokenInfo.expiry, 10) || 0;
+
+        if (Date.now() < tokenExpiryTime) {
+          isCachedTokenValid = true;
+          driveState.isConnected = true;
+          if (onStatusChange) onStatusChange(driveState);
+
+          // Trigger initial sync with cached token
+          syncWithDrive(onDataReceived, onStatusChange);
+        }
+      }
+    } catch (e) {
+      console.error('Error parsing gdrive_token_info:', e);
     }
   }
 
+  // 2. Initialize GIS Token Client
   const checkGISLoaded = () => {
     if (window.google && window.google.accounts && window.google.accounts.oauth2) {
       tokenClient = window.google.accounts.oauth2.initTokenClient({
@@ -98,20 +127,17 @@ export function initDriveSync(onStatusChange, onDataReceived) {
         scope: SCOPE,
         callback: async (response) => {
           if (response.error) {
-            console.error('OAuth Error:', response.error);
+            console.warn('OAuth GIS Response:', response.error);
             driveState.error = response.error;
             driveState.isSyncing = false;
             driveState.isConnected = false;
+            localStorage.removeItem(TOKEN_INFO_KEY);
             if (onStatusChange) onStatusChange(driveState);
             return;
           }
 
-          accessToken = response.access_token;
-          const expiresIn = response.expires_in || 3590;
-          tokenExpiryTime = Date.now() + (expiresIn - 60) * 1000;
-
-          sessionStorage.setItem(TOKEN_KEY, accessToken);
-          sessionStorage.setItem(EXPIRY_KEY, String(tokenExpiryTime));
+          // Save fresh token to localStorage
+          saveTokenInfo(response.access_token, response.expires_in);
 
           driveState.isConnected = true;
           driveState.error = null;
@@ -136,16 +162,20 @@ export function initDriveSync(onStatusChange, onDataReceived) {
 
           if (onStatusChange) onStatusChange(driveState);
 
-          // Perform initial sync with Google Drive appDataFolder
+          // Perform sync with Google Drive appDataFolder
           if (onDataReceived) {
             await syncWithDrive(onDataReceived, onStatusChange);
           }
         }
       });
 
-      // If we had a cached token, attempt a silent validation/refresh
-      if (cachedToken && Date.now() >= tokenExpiryTime) {
-        tokenClient.requestAccessToken({ prompt: '' });
+      // 3. Silent re-auth if token was missing or expired but user was previously logged in
+      if (!isCachedTokenValid && (cachedTokenInfoStr || cachedUser)) {
+        try {
+          tokenClient.requestAccessToken({ prompt: '' });
+        } catch (se) {
+          console.warn('Silent re-auth failed on init:', se);
+        }
       }
     } else {
       setTimeout(checkGISLoaded, 300);
@@ -156,7 +186,7 @@ export function initDriveSync(onStatusChange, onDataReceived) {
 }
 
 /**
- * Trigger OAuth login flow
+ * Trigger explicit OAuth login flow with user consent
  */
 export function loginGoogleDrive() {
   if (tokenClient) {
@@ -167,18 +197,23 @@ export function loginGoogleDrive() {
 }
 
 /**
- * Logout from Google Drive sync
+ * Logout from Google Drive sync and clean localStorage token info
  */
 export function logoutGoogleDrive(onStatusChange) {
   if (accessToken && window.google?.accounts?.oauth2) {
-    window.google.accounts.oauth2.revoke(accessToken, () => {});
+    try {
+      window.google.accounts.oauth2.revoke(accessToken, () => {});
+    } catch (e) {}
   }
+
   accessToken = null;
   driveFileId = null;
   tokenExpiryTime = 0;
-  sessionStorage.removeItem(TOKEN_KEY);
-  sessionStorage.removeItem(EXPIRY_KEY);
+
+  localStorage.removeItem(TOKEN_INFO_KEY);
   localStorage.removeItem(USER_KEY);
+  sessionStorage.removeItem('speedsuivi_gdrive_token');
+  sessionStorage.removeItem('speedsuivi_gdrive_expiry');
 
   driveState.isConnected = false;
   driveState.isSyncing = false;
@@ -203,7 +238,7 @@ async function findDriveFile() {
     if (!res.ok) {
       if (res.status === 401) {
         driveState.isConnected = false;
-        sessionStorage.removeItem(TOKEN_KEY);
+        localStorage.removeItem(TOKEN_INFO_KEY);
       }
       return null;
     }
