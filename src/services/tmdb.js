@@ -169,9 +169,9 @@ export function formatMediaItem(rawItem) {
   const posterPath = rawItem.poster_path ? `${POSTER_BASE}${rawItem.poster_path}` : PLACEHOLDER_POSTER;
   const backdropPath = rawItem.backdrop_path ? `${BACKDROP_BASE}${rawItem.backdrop_path}` : null;
 
-  // Extract Cast (Top 10 actors/actresses) - Support for TV aggregate_credits
+  // Extract Cast (Top 20 actors/actresses) - Support for TV aggregate_credits
   const rawCast = rawItem.aggregate_credits?.cast || rawItem.credits?.cast || rawItem.cast || [];
-  const castList = rawCast.slice(0, 10).map(actor => {
+  const castList = rawCast.slice(0, 20).map(actor => {
     let charName = actor.character;
     if (!charName && actor.roles && actor.roles.length > 0) {
       charName = actor.roles.map(r => r.character).filter(Boolean).join(' / ');

@@ -123,6 +123,34 @@
       flex: 0 0 auto !important;
       width: 140px !important;
     }
+
+    .cast-carousel {
+      display: flex;
+      overflow-x: auto;
+      gap: 1.2rem;
+      scroll-behavior: smooth;
+      padding-bottom: 0.5rem;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+    }
+    .cast-carousel::-webkit-scrollbar {
+      height: 6px;
+    }
+    .cast-carousel::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .cast-carousel::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 9999px;
+    }
+    .cast-carousel::-webkit-scrollbar-thumb:hover {
+      background: rgba(229, 9, 20, 0.8);
+    }
+    .cast-card {
+      flex: 0 0 auto !important;
+      width: 112px !important;
+    }
   </style>
 </head>
 <body class="min-h-screen flex flex-col selection:bg-netflixRed selection:text-white">
@@ -1151,15 +1179,39 @@
 
         <!-- Section Casting / Têtes d'affiche -->
         <div class="space-y-3 bg-cardBg/60 p-6 rounded-2xl border border-white/10 shadow-xl">
-          <h4 class="text-xs font-heading font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
-            <span>🎭</span> <span>Têtes d'affiche / Casting</span>
-          </h4>
-          <div v-if="selectedMedia.cast && selectedMedia.cast.length > 0" class="flex gap-4 overflow-x-auto pb-3 pt-1 scroll-smooth no-scrollbar">
+          <div class="flex items-center justify-between">
+            <h4 class="text-xs font-heading font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
+              <span>🎭</span> <span>Têtes d'affiche / Casting</span>
+            </h4>
+            <!-- Arrow Navigation Buttons -->
+            <div v-if="selectedMedia.cast && selectedMedia.cast.length > 0" class="flex items-center gap-2">
+              <button 
+                @click="scrollCastLeft" 
+                class="w-7 h-7 rounded-full bg-black/60 hover:bg-netflixRed border border-white/10 flex items-center justify-center text-white text-xs font-bold transition-all shadow-md active:scale-95"
+                title="Défiler le casting vers la gauche"
+              >
+                ❮
+              </button>
+              <button 
+                @click="scrollCastRight" 
+                class="w-7 h-7 rounded-full bg-black/60 hover:bg-netflixRed border border-white/10 flex items-center justify-center text-white text-xs font-bold transition-all shadow-md active:scale-95"
+                title="Défiler le casting vers la droite"
+              >
+                ❯
+              </button>
+            </div>
+          </div>
+
+          <div 
+            v-if="selectedMedia.cast && selectedMedia.cast.length > 0" 
+            ref="castCarouselRef"
+            class="cast-carousel pt-1"
+          >
             <div 
               v-for="actor in selectedMedia.cast" 
               :key="actor.id" 
               @click="openPersonDetail(actor.id)"
-              class="flex-none w-28 text-center space-y-2 group cursor-pointer"
+              class="cast-card text-center space-y-2 group cursor-pointer"
             >
               <div class="w-24 h-24 mx-auto rounded-full overflow-hidden border-2 border-white/10 group-hover:border-netflixRed transition-all shadow-lg bg-surfaceBg relative">
                 <img 
@@ -1876,6 +1928,20 @@
         const scrollFamousRight = () => {
           if (famousCarouselRef.value) {
             famousCarouselRef.value.scrollBy({ left: 320, behavior: 'smooth' });
+          }
+        };
+
+        const castCarouselRef = ref(null);
+
+        const scrollCastLeft = () => {
+          if (castCarouselRef.value) {
+            castCarouselRef.value.scrollBy({ left: -320, behavior: 'smooth' });
+          }
+        };
+
+        const scrollCastRight = () => {
+          if (castCarouselRef.value) {
+            castCarouselRef.value.scrollBy({ left: 320, behavior: 'smooth' });
           }
         };
 
@@ -2625,6 +2691,9 @@
           famousCarouselRef,
           scrollFamousLeft,
           scrollFamousRight,
+          castCarouselRef,
+          scrollCastLeft,
+          scrollCastRight,
           formatDate,
           getAge,
           scrollToTop,
