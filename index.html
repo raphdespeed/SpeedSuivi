@@ -939,7 +939,7 @@
     </nav>
 
     <!-- ================= FULL PAGE MEDIA DETAIL VIEW ================= -->
-    <div v-if="selectedMedia" class="min-h-screen bg-darkBg text-white flex flex-col flex-1 pb-24 animate-fadeIn relative z-40">
+    <div v-if="selectedMedia && !selectedPerson" class="min-h-screen bg-darkBg text-white flex flex-col flex-1 pb-24 animate-fadeIn relative z-40">
       
       <!-- Sticky Top Back Bar -->
       <div class="sticky top-4 left-4 md:top-6 md:left-8 z-50 px-4 md:px-8">
@@ -1625,11 +1625,13 @@
           selectedPerson.value = null;
           activeTab.value = tabName;
           window.location.hash = `#${tabName}`;
-          window.scrollTo({ top: 0, behavior: 'smooth' });
+          window.scrollTo({ top: 0, behavior: 'instant' });
         };
 
         const updateRouteFromHash = () => {
           const hash = window.location.hash || '#home';
+          window.scrollTo({ top: 0, behavior: 'instant' });
+
           if (hash.startsWith('#media/')) {
             selectedPerson.value = null;
             const mediaId = hash.replace('#media/', '');
@@ -1658,8 +1660,8 @@
         };
 
         const openMediaDetail = async (item, updateHash = true) => {
-          selectedMedia.value = item;
           selectedPerson.value = null;
+          selectedMedia.value = item;
           modalStatus.value = item.status || 'in_progress';
           modalSeason.value = item.currentSeason || 1;
           modalEpisode.value = item.currentEpisode || 0;
@@ -1668,7 +1670,7 @@
             window.location.hash = `#media/${item.id}`;
           }
 
-          window.scrollTo({ top: 0, behavior: 'smooth' });
+          window.scrollTo({ top: 0, behavior: 'instant' });
 
           enrichWatchProviders(item);
           fetchRecommendationsForMedia(item);
@@ -1684,7 +1686,7 @@
             window.location.hash = `#actor/${personId}`;
           }
 
-          window.scrollTo({ top: 0, behavior: 'smooth' });
+          window.scrollTo({ top: 0, behavior: 'instant' });
 
           try {
             const url = `${BASE_URL}/person/${personId}?language=fr-FR&append_to_response=combined_credits,external_ids`;
@@ -1731,6 +1733,7 @@
           if (window.location.hash.startsWith('#actor/')) {
             window.history.back();
           }
+          window.scrollTo({ top: 0, behavior: 'instant' });
         };
 
         const fetchExtendedMediaDetails = async (item) => {
@@ -1759,6 +1762,7 @@
           if (window.location.hash.startsWith('#media/')) {
             window.history.back();
           }
+          window.scrollTo({ top: 0, behavior: 'instant' });
         };
 
         const fetchMediaByIdAndOpen = async (mediaId) => {
