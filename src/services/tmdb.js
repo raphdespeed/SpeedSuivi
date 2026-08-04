@@ -90,7 +90,7 @@ export async function getTrendingMedia() {
 export async function getMediaDetails(id, mediaType) {
   try {
     const type = (mediaType === 'movie' || mediaType === 'film') ? 'movie' : 'tv';
-    const url = `${BASE_URL}/${type}/${id}?language=fr-FR&append_to_response=credits,videos,images&include_image_language=fr,null,en`;
+    const url = `${BASE_URL}/${type}/${id}?language=fr-FR&append_to_response=credits,aggregate_credits,videos,images&include_image_language=fr,null,en`;
     const response = await fetch(url);
     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
     const data = await response.json();
@@ -165,13 +165,20 @@ export function formatMediaItem(rawItem) {
   const posterPath = rawItem.poster_path ? `${POSTER_BASE}${rawItem.poster_path}` : PLACEHOLDER_POSTER;
   const backdropPath = rawItem.backdrop_path ? `${BACKDROP_BASE}${rawItem.backdrop_path}` : null;
 
-  // Extract Cast (Top 10 actors/actresses)
-  const castList = (rawItem.credits?.cast || rawItem.cast || []).slice(0, 10).map(actor => ({
-    id: actor.id,
-    name: actor.name,
-    character: actor.character || (actor.roles && actor.roles[0]?.character) || 'Rôle inconnu',
-    profilePath: actor.profile_path ? `https://image.tmdb.org/t/p/w185${actor.profile_path}` : null
-  }));
+  // Extract Cast (Top 10 actors/actresses) - Support for TV aggregate_credits
+  const rawCast = rawItem.aggregate_credits?.cast || rawItem.credits?.cast || rawItem.cast || [];
+  const castList = rawCast.slice(0, 10).map(actor => {
+    let charName = actor.character;
+    if (!charName && actor.roles && actor.roles.length > 0) {
+      charName = actor.roles.map(r => r.character).filter(Boolean).join(' / ');
+    }
+    return {
+      id: actor.id,
+      name: actor.name,
+      character: charName || 'Rôle inconnu',
+      profilePath: actor.profile_path ? `https://image.tmdb.org/t/p/w185${actor.profile_path}` : null
+    };
+  });
 
   // Extract Official YouTube Trailer Key
   const videoResults = rawItem.videos?.results || [];

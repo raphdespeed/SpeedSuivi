@@ -1123,11 +1123,11 @@
         </div>
 
         <!-- Section Casting / Têtes d'affiche -->
-        <div v-if="selectedMedia.cast && selectedMedia.cast.length > 0" class="space-y-3 bg-cardBg/60 p-6 rounded-2xl border border-white/10 shadow-xl">
+        <div class="space-y-3 bg-cardBg/60 p-6 rounded-2xl border border-white/10 shadow-xl">
           <h4 class="text-xs font-heading font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
             <span>🎭</span> <span>Têtes d'affiche / Casting</span>
           </h4>
-          <div class="flex gap-4 overflow-x-auto pb-3 pt-1 scroll-smooth no-scrollbar">
+          <div v-if="selectedMedia.cast && selectedMedia.cast.length > 0" class="flex gap-4 overflow-x-auto pb-3 pt-1 scroll-smooth no-scrollbar">
             <div 
               v-for="actor in selectedMedia.cast" 
               :key="actor.id" 
@@ -1156,6 +1156,7 @@
               </div>
             </div>
           </div>
+          <p v-else class="text-xs text-gray-500 italic">Aucune information sur le casting disponible pour ce média.</p>
         </div>
 
         <!-- Section Galerie de Photos (Backdrops HD) -->
@@ -1565,13 +1566,20 @@
           const posterUrl = raw.poster_path ? `${POSTER_BASE}${raw.poster_path}` : createSvgPlaceholder(title);
           const rawGenreIds = raw.genre_ids || (raw.genres ? raw.genres.map(g => g.id) : []);
 
-          // Extract Cast (Top 10 actors/actresses)
-          const castList = (raw.credits?.cast || raw.cast || []).slice(0, 10).map(actor => ({
-            id: actor.id,
-            name: actor.name,
-            character: actor.character || (actor.roles && actor.roles[0]?.character) || 'Rôle inconnu',
-            profilePath: actor.profile_path ? `https://image.tmdb.org/t/p/w185${actor.profile_path}` : null
-          }));
+          // Extract Cast (Top 10 actors/actresses) - Support for TV aggregate_credits
+          const rawCast = raw.aggregate_credits?.cast || raw.credits?.cast || raw.cast || [];
+          const castList = rawCast.slice(0, 10).map(actor => {
+            let charName = actor.character;
+            if (!charName && actor.roles && actor.roles.length > 0) {
+              charName = actor.roles.map(r => r.character).filter(Boolean).join(' / ');
+            }
+            return {
+              id: actor.id,
+              name: actor.name,
+              character: charName || 'Rôle inconnu',
+              profilePath: actor.profile_path ? `https://image.tmdb.org/t/p/w185${actor.profile_path}` : null
+            };
+          });
 
           // Extract Official YouTube Trailer Key
           const videoResults = raw.videos?.results || [];
@@ -1728,7 +1736,7 @@
         const fetchExtendedMediaDetails = async (item) => {
           try {
             const type = item.mediaType === 'movie' ? 'movie' : 'tv';
-            const url = `${BASE_URL}/${type}/${item.tmdbId}?language=fr-FR&append_to_response=credits,videos,images&include_image_language=fr,null,en`;
+            const url = `${BASE_URL}/${type}/${item.tmdbId}?language=fr-FR&append_to_response=credits,aggregate_credits,videos,images&include_image_language=fr,null,en`;
             const res = await fetch(url);
             if (!res.ok) return;
             const data = await res.json();
@@ -1758,7 +1766,7 @@
             const [type, tmdbId] = mediaId.split('_');
             if (!tmdbId) return;
             const typeUrl = (type === 'movie' || type === 'film') ? 'movie' : 'tv';
-            const res = await fetch(`${BASE_URL}/${typeUrl}/${tmdbId}?language=fr-FR&append_to_response=credits,videos,images&include_image_language=fr,null,en`);
+            const res = await fetch(`${BASE_URL}/${typeUrl}/${tmdbId}?language=fr-FR&append_to_response=credits,aggregate_credits,videos,images&include_image_language=fr,null,en`);
             const raw = await res.json();
             if (raw && raw.id) {
               const formatted = formatItem({ ...raw, media_type: typeUrl });
