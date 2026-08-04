@@ -1007,33 +1007,42 @@
     <!-- ================= ROUTE 2: FULL PAGE MEDIA DETAIL VIEW (FIXED HERO BACKDROP & SLIDING CONTENT) ================= -->
     <div v-else-if="currentRoute === 'media'" class="min-h-screen bg-darkBg text-white flex flex-col flex-1 pb-24 animate-fadeIn relative z-40" key="media-view">
       
-      <!-- Fixed Background Hero Backdrop Image (70vh fixed layer) -->
+      <!-- Fixed Background Hero Backdrop Image (Full-Width Real 85vh fixed layer) -->
       <div 
         v-if="selectedMedia.backdropPath"
-        class="fixed top-0 left-0 w-full h-[70vh] z-0 pointer-events-none overflow-hidden"
-        style="mask-image: linear-gradient(to bottom, black 55%, transparent 100%); -webkit-mask-image: linear-gradient(to bottom, black 55%, transparent 100%);"
+        class="fixed top-0 left-1/2 -translate-x-1/2 w-screen h-[85vh] z-0 pointer-events-none overflow-hidden"
+        style="mask-image: linear-gradient(to bottom, black 65%, transparent 100%); -webkit-mask-image: linear-gradient(to bottom, black 65%, transparent 100%);"
       >
         <img 
           :src="selectedMedia.backdropPath" 
           :alt="selectedMedia.title" 
-          class="w-full h-full object-cover object-top opacity-55"
+          class="w-full h-full object-cover object-top"
         />
-        <div class="absolute inset-0 bg-gradient-to-b from-darkBg/40 via-transparent to-darkBg"></div>
       </div>
 
-      <!-- Sticky Top Back Bar -->
-      <div class="sticky top-[72px] left-4 md:top-[72px] md:left-8 z-50 px-4 md:px-8">
+      <!-- Sticky Top Back & Backdrop Inspection Bar -->
+      <div class="sticky top-[72px] left-4 md:top-[72px] md:left-8 z-50 px-4 md:px-8 flex items-center justify-between pointer-events-none">
         <button 
           @click="closeDetailView"
-          class="inline-flex items-center gap-2 bg-black/80 hover:bg-netflixRed text-white text-xs md:text-sm font-heading font-bold px-4 py-2.5 rounded-full border border-white/20 shadow-2xl backdrop-blur-md transition-all active:scale-95 group"
+          class="pointer-events-auto inline-flex items-center gap-2 bg-black/80 hover:bg-netflixRed text-white text-xs md:text-sm font-heading font-bold px-4 py-2.5 rounded-full border border-white/20 shadow-2xl backdrop-blur-md transition-all active:scale-95 group"
         >
           <span class="transform group-hover:-translate-x-1 transition-transform">←</span>
           <span>Retour à la navigation</span>
         </button>
+
+        <button 
+          v-if="selectedMedia.backdropPath"
+          @click="activeLightboxImage = selectedMedia.backdropPath"
+          class="pointer-events-auto inline-flex items-center gap-2 bg-black/80 hover:bg-white/20 text-white text-xs md:text-sm font-heading font-bold px-4 py-2.5 rounded-full border border-white/20 shadow-2xl backdrop-blur-md transition-all active:scale-95"
+          title="Voir la photo de couverture en plein écran"
+        >
+          <span>👁️</span>
+          <span class="hidden sm:inline">Voir l'image</span>
+        </button>
       </div>
 
       <!-- Main Detail Content Container (Superposed & Sliding Over Fixed Backdrop) -->
-      <div class="relative z-10 max-w-6xl mx-auto w-full px-4 md:px-8 space-y-8 flex-1 mt-[25vh] md:mt-[32vh]">
+      <div class="relative z-10 max-w-6xl mx-auto w-full px-4 md:px-8 space-y-8 flex-1 mt-[35vh] md:mt-[40vh]">
         
         <!-- Header Card: Poster + Title + Badges -->
         <div class="flex flex-col md:flex-row gap-6 md:gap-8 items-end bg-black/60 backdrop-blur-xl p-6 md:p-8 rounded-3xl border border-white/10 shadow-2xl">
