@@ -90,7 +90,7 @@ export async function getTrendingMedia() {
 export async function getMediaDetails(id, mediaType) {
   try {
     const type = (mediaType === 'movie' || mediaType === 'film') ? 'movie' : 'tv';
-    const url = `${BASE_URL}/${type}/${id}?language=fr-FR&append_to_response=videos,credits`;
+    const url = `${BASE_URL}/${type}/${id}?language=fr-FR&append_to_response=credits,videos,images&include_image_language=fr,null,en`;
     const response = await fetch(url);
     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
     const data = await response.json();
@@ -132,6 +132,27 @@ export function formatMediaItem(rawItem) {
   const posterPath = rawItem.poster_path ? `${POSTER_BASE}${rawItem.poster_path}` : PLACEHOLDER_POSTER;
   const backdropPath = rawItem.backdrop_path ? `${BACKDROP_BASE}${rawItem.backdrop_path}` : null;
 
+  // Extract Cast (Top 10 actors/actresses)
+  const castList = (rawItem.credits?.cast || rawItem.cast || []).slice(0, 10).map(actor => ({
+    id: actor.id,
+    name: actor.name,
+    character: actor.character || (actor.roles && actor.roles[0]?.character) || 'Rôle inconnu',
+    profilePath: actor.profile_path ? `https://image.tmdb.org/t/p/w185${actor.profile_path}` : null
+  }));
+
+  // Extract Official YouTube Trailer Key
+  const videoResults = rawItem.videos?.results || [];
+  const trailers = videoResults.filter(v => v.site === 'YouTube' && (v.type === 'Trailer' || v.type === 'Teaser'));
+  let selectedTrailer = trailers.find(v => v.iso_639_1 === 'fr') || trailers.find(v => v.iso_639_1 === 'en') || trailers[0];
+  const trailerKey = selectedTrailer ? selectedTrailer.key : null;
+
+  // Extract Photo Gallery Backdrops (HD 6 to 8 images)
+  const rawBackdrops = rawItem.images?.backdrops || [];
+  const galleryImages = rawBackdrops.slice(0, 8).map(img => ({
+    full: `https://image.tmdb.org/t/p/w1280${img.file_path}`,
+    thumb: `https://image.tmdb.org/t/p/w780${img.file_path}`
+  }));
+
   return {
     id: rawItem.id,
     tmdbId: rawItem.id,
@@ -147,6 +168,9 @@ export function formatMediaItem(rawItem) {
     voteAverage: rawItem.vote_average ? Math.round(rawItem.vote_average * 10) / 10 : null,
     voteCount: rawItem.vote_count || 0,
     genres: rawItem.genres ? rawItem.genres.map(g => g.name) : [],
+    cast: castList,
+    trailerKey: trailerKey,
+    galleryImages: galleryImages,
     // Series / TV specific properties
     numberOfSeasons: rawItem.number_of_seasons || 1,
     numberOfEpisodes: rawItem.number_of_episodes || (isMovie ? 1 : 12),

@@ -1106,6 +1106,77 @@
           </div>
         </div>
 
+        <!-- Section YouTube Trailer -->
+        <div v-if="selectedMedia.trailerKey" class="space-y-3 bg-cardBg/60 p-6 rounded-2xl border border-white/10 shadow-xl">
+          <h4 class="text-xs font-heading font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
+            <span>🎬</span> <span>Bande-Annonce Officielle</span>
+          </h4>
+          <div class="relative w-full aspect-video rounded-xl overflow-hidden border border-white/10 shadow-2xl bg-black">
+            <iframe 
+              :src="`https://www.youtube-nocookie.com/embed/${selectedMedia.trailerKey}`" 
+              title="Bande-Annonce Officielle" 
+              class="w-full h-full border-0" 
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+              allowfullscreen
+            ></iframe>
+          </div>
+        </div>
+
+        <!-- Section Casting / Têtes d'affiche -->
+        <div v-if="selectedMedia.cast && selectedMedia.cast.length > 0" class="space-y-3 bg-cardBg/60 p-6 rounded-2xl border border-white/10 shadow-xl">
+          <h4 class="text-xs font-heading font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
+            <span>🎭</span> <span>Têtes d'affiche / Casting</span>
+          </h4>
+          <div class="flex gap-4 overflow-x-auto pb-3 pt-1 scroll-smooth no-scrollbar">
+            <div 
+              v-for="actor in selectedMedia.cast" 
+              :key="actor.id" 
+              class="flex-none w-28 text-center space-y-2 group"
+            >
+              <div class="w-24 h-24 mx-auto rounded-full overflow-hidden border-2 border-white/10 group-hover:border-netflixRed transition-all shadow-lg bg-surfaceBg relative">
+                <img 
+                  v-if="actor.profilePath" 
+                  :src="actor.profilePath" 
+                  :alt="actor.name" 
+                  class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                  loading="lazy"
+                />
+                <div v-else class="w-full h-full flex items-center justify-center bg-gray-800 text-gray-400 text-2xl font-heading">
+                  👤
+                </div>
+              </div>
+              <div class="space-y-0.5">
+                <h5 class="text-xs font-heading font-bold text-white line-clamp-1 leading-tight group-hover:text-netflixRed transition-colors" :title="actor.name">
+                  {{ actor.name }}
+                </h5>
+                <p class="text-[11px] text-gray-400 line-clamp-1 leading-tight" :title="actor.character">
+                  {{ actor.character }}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section Galerie de Photos (Backdrops HD) -->
+        <div v-if="selectedMedia.galleryImages && selectedMedia.galleryImages.length > 0" class="space-y-3 bg-cardBg/60 p-6 rounded-2xl border border-white/10 shadow-xl">
+          <h4 class="text-xs font-heading font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
+            <span>🖼️</span> <span>Galerie de Photos & Captures</span>
+          </h4>
+          <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 md:gap-4">
+            <div 
+              v-for="(img, idx) in selectedMedia.galleryImages" 
+              :key="idx"
+              @click="activeLightboxImage = img.full"
+              class="aspect-video bg-gray-900 rounded-xl overflow-hidden border border-white/10 hover:border-netflixRed hover:scale-[1.03] transition-all cursor-pointer shadow-lg group relative"
+            >
+              <img :src="img.thumb" :alt="`Capture ${idx + 1}`" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
+              <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                <span class="text-white text-xl">🔍</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- TMDB Recommendations & Similar Titles Carousel -->
         <div class="space-y-4 pt-6 border-t border-white/10">
           <h3 class="text-sm font-heading font-bold text-white uppercase tracking-wider flex items-center gap-2">
@@ -1142,6 +1213,24 @@
 
       </div>
 
+    </div>
+
+    <!-- Lightbox Modal for Photo Gallery -->
+    <div 
+      v-if="activeLightboxImage" 
+      @click="activeLightboxImage = null"
+      class="fixed inset-0 z-[300] bg-black/95 flex items-center justify-center p-4 md:p-8 animate-fadeIn"
+    >
+      <button 
+        @click="activeLightboxImage = null"
+        class="absolute top-6 right-6 z-10 w-12 h-12 rounded-full bg-black/80 hover:bg-netflixRed text-white text-2xl flex items-center justify-center transition-colors border border-white/20 shadow-2xl"
+      >&times;</button>
+      <img 
+        :src="activeLightboxImage" 
+        alt="Photo HD agrandie" 
+        class="max-w-full max-h-[90vh] object-contain rounded-xl shadow-2xl border border-white/10" 
+        @click.stop
+      />
     </div>
 
     <!-- Floating Back to Top Button -->
@@ -1303,6 +1392,8 @@
         // Synchronous initial load of saved collection
         loadCollection();
 
+        const activeLightboxImage = ref(null);
+
         // Category detection
         const detectCategory = (item) => {
           if (item.media_type === 'movie' || (!item.media_type && item.title && !item.name)) {
@@ -1335,6 +1426,27 @@
           const posterUrl = raw.poster_path ? `${POSTER_BASE}${raw.poster_path}` : createSvgPlaceholder(title);
           const rawGenreIds = raw.genre_ids || (raw.genres ? raw.genres.map(g => g.id) : []);
 
+          // Extract Cast (Top 10 actors/actresses)
+          const castList = (raw.credits?.cast || raw.cast || []).slice(0, 10).map(actor => ({
+            id: actor.id,
+            name: actor.name,
+            character: actor.character || (actor.roles && actor.roles[0]?.character) || 'Rôle inconnu',
+            profilePath: actor.profile_path ? `https://image.tmdb.org/t/p/w185${actor.profile_path}` : null
+          }));
+
+          // Extract Official YouTube Trailer Key
+          const videoResults = raw.videos?.results || [];
+          const trailers = videoResults.filter(v => v.site === 'YouTube' && (v.type === 'Trailer' || v.type === 'Teaser'));
+          let selectedTrailer = trailers.find(v => v.iso_639_1 === 'fr') || trailers.find(v => v.iso_639_1 === 'en') || trailers[0];
+          const trailerKey = selectedTrailer ? selectedTrailer.key : null;
+
+          // Extract Photo Gallery Backdrops (HD 6 to 8 images)
+          const rawBackdrops = raw.images?.backdrops || [];
+          const galleryImages = rawBackdrops.slice(0, 8).map(img => ({
+            full: `https://image.tmdb.org/t/p/w1280${img.file_path}`,
+            thumb: `https://image.tmdb.org/t/p/w780${img.file_path}`
+          }));
+
           return {
             id: `${isMovie ? 'movie' : 'tv'}_${raw.id}`,
             tmdbId: raw.id,
@@ -1349,6 +1461,9 @@
             year: releaseDate ? releaseDate.substring(0, 4) : '',
             voteAverage: raw.vote_average ? Math.round(raw.vote_average * 10) / 10 : null,
             genreIds: rawGenreIds,
+            cast: castList,
+            trailerKey: trailerKey,
+            galleryImages: galleryImages,
             totalSeasons: raw.number_of_seasons || 1,
             totalEpisodes: raw.number_of_episodes || (isMovie ? 1 : 12),
             isFavorite: raw.isFavorite || false,
@@ -1400,6 +1515,28 @@
 
           enrichWatchProviders(item);
           fetchRecommendationsForMedia(item);
+          fetchExtendedMediaDetails(item);
+        };
+
+        const fetchExtendedMediaDetails = async (item) => {
+          try {
+            const type = item.mediaType === 'movie' ? 'movie' : 'tv';
+            const url = `${BASE_URL}/${type}/${item.tmdbId}?language=fr-FR&append_to_response=credits,videos,images&include_image_language=fr,null,en`;
+            const res = await fetch(url);
+            if (!res.ok) return;
+            const data = await res.json();
+            
+            const formatted = formatItem({ ...data, media_type: type });
+            if (selectedMedia.value && selectedMedia.value.id === item.id) {
+              selectedMedia.value.cast = formatted.cast;
+              selectedMedia.value.trailerKey = formatted.trailerKey;
+              selectedMedia.value.galleryImages = formatted.galleryImages;
+              if (formatted.totalEpisodes) selectedMedia.value.totalEpisodes = formatted.totalEpisodes;
+              if (formatted.totalSeasons) selectedMedia.value.totalSeasons = formatted.totalSeasons;
+            }
+          } catch (e) {
+            console.error('Error fetching extended media details:', e);
+          }
         };
 
         const closeDetailView = () => {
@@ -1414,7 +1551,7 @@
             const [type, tmdbId] = mediaId.split('_');
             if (!tmdbId) return;
             const typeUrl = (type === 'movie' || type === 'film') ? 'movie' : 'tv';
-            const res = await fetch(`${BASE_URL}/${typeUrl}/${tmdbId}?language=fr-FR`);
+            const res = await fetch(`${BASE_URL}/${typeUrl}/${tmdbId}?language=fr-FR&append_to_response=credits,videos,images&include_image_language=fr,null,en`);
             const raw = await res.json();
             if (raw && raw.id) {
               const formatted = formatItem({ ...raw, media_type: typeUrl });
@@ -2083,6 +2220,7 @@
           showBackToTop,
           collection,
           selectedMedia,
+          activeLightboxImage,
           modalStatus,
           modalSeason,
           modalEpisode,
