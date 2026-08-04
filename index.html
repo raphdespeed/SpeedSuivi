@@ -189,39 +189,39 @@
 
       </div>
 
-      <!-- Sub-Bar Filters: Category, Streaming Platforms, Genre & Year -->
+      <!-- Sub-Bar Filters: 3 Clean Structured Rows -->
       <div class="max-w-7xl mx-auto mt-3 space-y-2">
-        <div class="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar flex-wrap">
-          <!-- Category Pills -->
-          <span class="text-[11px] font-heading font-bold text-gray-400 uppercase tracking-wider hidden sm:inline">Type :</span>
+        <!-- Row 1: TYPE Pills -->
+        <div class="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar flex-nowrap">
+          <span class="text-[11px] font-heading font-bold text-gray-400 uppercase tracking-wider shrink-0">Type :</span>
           <button 
             v-for="filter in filterOptions" 
             :key="filter.id"
             @click="onSelectCategoryFilter(filter.id)"
-            :class="['text-xs font-heading font-semibold px-3.5 py-1.5 rounded-full whitespace-nowrap border transition-all', activeFilter === filter.id ? 'bg-netflixRed/20 border-netflixRed text-white font-bold' : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10 hover:text-white']"
+            :class="['text-xs font-heading font-semibold px-3.5 py-1.5 rounded-full whitespace-nowrap border transition-all shrink-0', activeFilter === filter.id ? 'bg-netflixRed/20 border-netflixRed text-white font-bold' : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10 hover:text-white']"
           >
             {{ filter.label }}
           </button>
+        </div>
 
-          <div class="h-4 w-px bg-white/10 mx-1 hidden sm:block"></div>
-
-          <!-- Streaming Provider Filter Pills (TMDB Discover FR) -->
-          <span class="text-[11px] font-heading font-bold text-gray-400 uppercase tracking-wider hidden sm:inline">Plateforme FR :</span>
+        <!-- Row 2: PLATEFORME FR Pills (Single continuous row with smooth scroll) -->
+        <div class="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar flex-nowrap pt-1 border-t border-white/5">
+          <span class="text-[11px] font-heading font-bold text-gray-400 uppercase tracking-wider shrink-0">Plateforme FR :</span>
           <button 
             v-for="provider in providerFilters"
             :key="provider.id"
             @click="onSelectProviderFilter(provider.id)"
-            :class="['text-xs font-heading font-semibold px-3 py-1.5 rounded-full whitespace-nowrap border transition-all flex items-center gap-1.5', activeProviderFilter === provider.id ? 'bg-white/20 border-white text-white font-bold' : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10 hover:text-white']"
+            :class="['text-xs font-heading font-semibold px-3 py-1.5 rounded-full whitespace-nowrap border transition-all flex items-center gap-1.5 shrink-0', activeProviderFilter === provider.id ? 'bg-white/20 border-white text-white font-bold' : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10 hover:text-white']"
           >
             <span>{{ provider.icon }}</span>
             <span>{{ provider.label }}</span>
           </button>
         </div>
 
-        <!-- Row 2: Genre & Year Filters -->
-        <div class="flex items-center gap-3 overflow-x-auto pb-1 no-scrollbar pt-1 border-t border-white/5">
+        <!-- Row 3: Genre & Year Filters -->
+        <div class="flex items-center gap-3 overflow-x-auto pb-1 no-scrollbar flex-nowrap pt-1 border-t border-white/5">
           <!-- Genre Dropdown -->
-          <div class="flex items-center gap-1.5">
+          <div class="flex items-center gap-1.5 shrink-0">
             <span class="text-[11px] font-heading font-bold text-gray-400 uppercase tracking-wider">🎭 Genre :</span>
             <select 
               v-model="activeGenreFilter" 
@@ -233,7 +233,7 @@
           </div>
 
           <!-- Year Dropdown -->
-          <div class="flex items-center gap-1.5">
+          <div class="flex items-center gap-1.5 shrink-0">
             <span class="text-[11px] font-heading font-bold text-gray-400 uppercase tracking-wider">📅 Année :</span>
             <select 
               v-model="activeYearFilter" 
@@ -249,7 +249,7 @@
           <button 
             v-if="hasActiveFilters" 
             @click="resetAllFilters"
-            class="text-[11px] font-heading font-bold text-netflixRed hover:text-white bg-netflixRed/10 hover:bg-netflixRed border border-netflixRed/30 px-2.5 py-1 rounded-xl transition-all ml-auto flex items-center gap-1"
+            class="text-[11px] font-heading font-bold text-netflixRed hover:text-white bg-netflixRed/10 hover:bg-netflixRed border border-netflixRed/30 px-2.5 py-1 rounded-xl transition-all ml-auto flex items-center gap-1 shrink-0 whitespace-nowrap"
             title="Réinitialiser tous les filtres"
           >
             <span>🔄</span> Réinitialiser
