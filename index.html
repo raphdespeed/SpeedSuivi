@@ -423,10 +423,20 @@
         </div>
 
         <!-- Search empty state -->
-        <div v-else-if="searchQuery.trim()" class="text-center py-16 space-y-3">
+        <div v-else-if="searchQuery.trim()" class="text-center py-16 space-y-4 max-w-md mx-auto">
           <div class="text-5xl">🕵️‍♂️</div>
           <h3 class="font-heading font-bold text-xl text-white">Aucun résultat trouvé</h3>
-          <p class="text-gray-400 text-sm">Aucun média ne correspond à "{{ searchQuery }}".</p>
+          <p class="text-gray-400 text-sm">
+            <span v-if="hasActiveFilters">Aucun média ne correspond à "{{ searchQuery }}" avec les filtres sélectionnés.</span>
+            <span v-else>Aucun média ne correspond à "{{ searchQuery }}".</span>
+          </p>
+          <button 
+            v-if="hasActiveFilters" 
+            @click="resetAllFilters"
+            class="bg-netflixRed/20 hover:bg-netflixRed border border-netflixRed text-white font-heading font-bold text-xs px-4 py-2 rounded-xl transition-all inline-flex items-center gap-1.5"
+          >
+            <span>🔄</span> Réinitialiser les filtres
+          </button>
         </div>
 
         <!-- Trending or Provider Discover Recommendations when search is empty -->
@@ -438,7 +448,20 @@
             </span>
           </h3>
           
-          <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
+          <!-- Empty State for Filtered Discover Grid -->
+          <div v-if="filteredTrendingResults.length === 0" class="bg-cardBg border border-white/10 rounded-2xl text-center py-16 px-6 space-y-4 max-w-md mx-auto shadow-xl">
+            <div class="text-5xl">🍿</div>
+            <h3 class="font-heading font-bold text-xl text-white">Aucun résultat trouvé</h3>
+            <p class="text-gray-400 text-sm">Aucun média ne correspond à cette combinaison de filtres.</p>
+            <button 
+              @click="resetAllFilters"
+              class="bg-netflixRed hover:bg-netflixRedHover text-white font-heading font-bold text-xs px-5 py-2.5 rounded-xl shadow-lg shadow-netflixRed/30 transition-all inline-flex items-center gap-1.5"
+            >
+              <span>🔄</span> Réinitialiser les filtres
+            </button>
+          </div>
+
+          <div v-else class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
             <div 
               v-for="item in filteredTrendingResults" 
               :key="item.id"
@@ -506,7 +529,7 @@
           </div>
 
           <!-- Bottom Pagination Controls for Discover / Trending -->
-          <div class="flex flex-col items-center justify-center pt-8 pb-4 space-y-3">
+          <div v-if="filteredTrendingResults.length > 0" class="flex flex-col items-center justify-center pt-8 pb-4 space-y-3">
             <div v-if="isLoadingMore" class="flex items-center gap-2 text-sm text-gray-400 font-heading">
               <div class="w-5 h-5 border-2 border-white/20 border-t-netflixRed rounded-full animate-spin"></div>
               <span>Chargement des titres suivants...</span>
@@ -546,9 +569,20 @@
           </div>
           <h3 class="font-heading font-bold text-xl text-white">Aucun contenu ici</h3>
           <p class="text-gray-400 text-sm">
-            {{ activeTab === 'in_progress' ? 'Ajoutez vos séries ou films en cours pour suivre votre avancement épisode par épisode !' : activeTab === 'watchlist' ? 'Explorez le catalogue TMDB et enregistrez des médias à voir.' : activeTab === 'completed' ? 'Marquez vos visionnages comme terminés pour remplir cet onglet.' : 'Cliquez sur l\'icône 🔄 sur n\'importe quel film ou série pour l\'ajouter à votre liste \'À revoir\' !' }}
+            <span v-if="hasActiveFilters">Aucun média dans cet onglet ne correspond aux filtres sélectionnés.</span>
+            <span v-else>
+              {{ activeTab === 'in_progress' ? 'Ajoutez vos séries ou films en cours pour suivre votre avancement épisode par épisode !' : activeTab === 'watchlist' ? 'Explorez le catalogue TMDB et enregistrez des médias à voir.' : activeTab === 'completed' ? 'Marquez vos visionnages comme terminés pour remplir cet onglet.' : 'Cliquez sur l\'icône 🔄 sur n\'importe quel film ou série pour l\'ajouter à votre liste \'À revoir\' !' }}
+            </span>
           </p>
           <button 
+            v-if="hasActiveFilters" 
+            @click="resetAllFilters"
+            class="bg-netflixRed/20 hover:bg-netflixRed border border-netflixRed text-white font-heading font-bold text-xs px-4 py-2 rounded-xl transition-all inline-flex items-center gap-1.5"
+          >
+            <span>🔄</span> Réinitialiser les filtres
+          </button>
+          <button 
+            v-else
             @click="activeTab = 'search'"
             class="bg-netflixRed hover:bg-netflixRedHover text-white font-heading font-bold text-sm px-6 py-2.5 rounded-xl shadow-lg shadow-netflixRed/30 transition-all"
           >
@@ -1292,33 +1326,60 @@
           }
         };
 
-        // Unified Discovery Engine (K-Drama / Provider / Genre / Year / Trending via Nginx Proxy)
+        // Unified Discovery Engine (Cumulative Type / Provider / Genre / Year via Nginx Proxy)
         const fetchDiscoveryContent = async (page = 1, append = false) => {
           if (!append) isSearching.value = true;
           try {
             let movieUrl = '';
             let tvUrl = '';
 
-            const genreParam = activeGenreFilter.value !== 'all' ? `&with_genres=${activeGenreFilter.value}` : '';
+            // Build genre parameters
+            const genreParams = [];
+            if (activeGenreFilter.value !== 'all') {
+              genreParams.push(activeGenreFilter.value);
+            }
+            if (activeFilter.value === 'anime') {
+              if (!genreParams.includes(16) && !genreParams.includes('16')) {
+                genreParams.push(16);
+              }
+            }
+
+            const genreString = genreParams.length > 0 ? `&with_genres=${genreParams.join(',')}` : '';
             const movieYearParam = activeYearFilter.value !== 'all' ? `&primary_release_year=${activeYearFilter.value}` : '';
             const tvYearParam = activeYearFilter.value !== 'all' ? `&first_air_date_year=${activeYearFilter.value}` : '';
 
-            if (activeFilter.value === 'kdrama') {
-              tvUrl = `${BASE_URL}/discover/tv?with_origin_country=KR&with_original_language=ko&language=fr-FR&sort_by=popularity.desc&page=${page}${genreParam}${tvYearParam}`;
-            } 
-            else if (activeProviderFilter.value !== 'all') {
+            let providerParam = '';
+            if (activeProviderFilter.value !== 'all') {
               const selected = providerFilters.find(p => p.id === activeProviderFilter.value);
-              const provId = selected?.providerId;
-              if (provId) {
-                movieUrl = `${BASE_URL}/discover/movie?with_watch_providers=${provId}&watch_region=FR&language=fr-FR&sort_by=popularity.desc&page=${page}${genreParam}${movieYearParam}`;
-                tvUrl = `${BASE_URL}/discover/tv?with_watch_providers=${provId}&watch_region=FR&language=fr-FR&sort_by=popularity.desc&page=${page}${genreParam}${tvYearParam}`;
+              if (selected?.providerId) {
+                providerParam = `&with_watch_providers=${selected.providerId}&watch_region=FR`;
               }
-            } 
-            else if (activeGenreFilter.value !== 'all' || activeYearFilter.value !== 'all') {
-              movieUrl = `${BASE_URL}/discover/movie?language=fr-FR&sort_by=popularity.desc&page=${page}${genreParam}${movieYearParam}`;
-              tvUrl = `${BASE_URL}/discover/tv?language=fr-FR&sort_by=popularity.desc&page=${page}${genreParam}${tvYearParam}`;
             }
-            else {
+
+            // Decide whether to query Movies, TV, or both depending on Type filter
+            const shouldFetchMovies = activeFilter.value === 'all' || activeFilter.value === 'movie' || activeFilter.value === 'anime';
+            const shouldFetchTV = activeFilter.value === 'all' || activeFilter.value === 'series' || activeFilter.value === 'anime' || activeFilter.value === 'kdrama';
+
+            const isAnyFilterActive = activeFilter.value !== 'all' || activeProviderFilter.value !== 'all' || activeGenreFilter.value !== 'all' || activeYearFilter.value !== 'all';
+
+            if (isAnyFilterActive) {
+              if (activeFilter.value === 'kdrama') {
+                if (shouldFetchTV) {
+                  tvUrl = `${BASE_URL}/discover/tv?with_origin_country=KR&with_original_language=ko&language=fr-FR&sort_by=popularity.desc&page=${page}${providerParam}${genreString}${tvYearParam}`;
+                }
+                if (shouldFetchMovies) {
+                  movieUrl = `${BASE_URL}/discover/movie?with_origin_country=KR&with_original_language=ko&language=fr-FR&sort_by=popularity.desc&page=${page}${providerParam}${genreString}${movieYearParam}`;
+                }
+              } else {
+                if (shouldFetchMovies) {
+                  movieUrl = `${BASE_URL}/discover/movie?language=fr-FR&sort_by=popularity.desc&page=${page}${providerParam}${genreString}${movieYearParam}`;
+                }
+                if (shouldFetchTV) {
+                  tvUrl = `${BASE_URL}/discover/tv?language=fr-FR&sort_by=popularity.desc&page=${page}${providerParam}${genreString}${tvYearParam}`;
+                }
+              }
+            } else {
+              // Default trending items
               const url = `${BASE_URL}/trending/all/week?language=fr-FR&page=${page}`;
               const res = await fetch(url);
               const data = await res.json();
@@ -1338,10 +1399,10 @@
             }
 
             const fetches = [];
-            if (movieUrl) fetches.push(fetch(movieUrl).then(r => r.json()));
+            if (movieUrl) fetches.push(fetch(movieUrl).then(r => r.ok ? r.json() : { results: [], total_pages: 1 }).catch(() => ({ results: [], total_pages: 1 })));
             else fetches.push(Promise.resolve({ results: [], total_pages: 1 }));
 
-            if (tvUrl) fetches.push(fetch(tvUrl).then(r => r.json()));
+            if (tvUrl) fetches.push(fetch(tvUrl).then(r => r.ok ? r.json() : { results: [], total_pages: 1 }).catch(() => ({ results: [], total_pages: 1 })));
             else fetches.push(Promise.resolve({ results: [], total_pages: 1 }));
 
             const [movieData, tvData] = await Promise.all(fetches);
@@ -1366,6 +1427,7 @@
             combined.forEach(item => enrichWatchProviders(item));
           } catch (e) {
             console.error('Discovery error:', e);
+            if (!append) trendingResults.value = [];
           } finally {
             if (!append) isSearching.value = false;
           }
@@ -1385,23 +1447,32 @@
         const onSelectCategoryFilter = (catId) => {
           activeFilter.value = catId;
           trendingPage.value = 1;
+          isSearching.value = true;
           if (!searchQuery.value.trim()) {
             fetchDiscoveryContent(1);
+          } else {
+            isSearching.value = false;
           }
         };
 
         const onSelectProviderFilter = (providerIdStr) => {
           activeProviderFilter.value = providerIdStr;
           trendingPage.value = 1;
+          isSearching.value = true;
           if (!searchQuery.value.trim()) {
             fetchDiscoveryContent(1);
+          } else {
+            isSearching.value = false;
           }
         };
 
         const onFilterChange = () => {
           trendingPage.value = 1;
+          isSearching.value = true;
           if (!searchQuery.value.trim()) {
             fetchDiscoveryContent(1);
+          } else {
+            isSearching.value = false;
           }
         };
 
@@ -1415,8 +1486,12 @@
           activeGenreFilter.value = 'all';
           activeYearFilter.value = 'all';
           trendingPage.value = 1;
+          searchPage.value = 1;
+          isSearching.value = true;
           if (!searchQuery.value.trim()) {
             fetchDiscoveryContent(1);
+          } else {
+            isSearching.value = false;
           }
         };
 
