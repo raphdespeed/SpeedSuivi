@@ -1738,10 +1738,16 @@
             };
           });
 
-          // Extract Official YouTube Trailer Key
+          // Extract Official YouTube Trailer Key (Prioritize FR Trailer > EN Trailer > Any Trailer > Any Teaser > Any YouTube Video)
           const videoResults = raw.videos?.results || [];
-          const trailers = videoResults.filter(v => v.site === 'YouTube' && (v.type === 'Trailer' || v.type === 'Teaser'));
-          let selectedTrailer = trailers.find(v => v.iso_639_1 === 'fr') || trailers.find(v => v.iso_639_1 === 'en') || trailers[0];
+          const youtubeVideos = videoResults.filter(v => v && v.site === 'YouTube');
+          let selectedTrailer = 
+            youtubeVideos.find(v => v.type === 'Trailer' && v.iso_639_1 === 'fr') ||
+            youtubeVideos.find(v => v.type === 'Trailer' && v.iso_639_1 === 'en') ||
+            youtubeVideos.find(v => v.type === 'Trailer') ||
+            youtubeVideos.find(v => v.type === 'Teaser' && v.iso_639_1 === 'fr') ||
+            youtubeVideos.find(v => v.type === 'Teaser') ||
+            youtubeVideos[0];
           const trailerKey = selectedTrailer ? selectedTrailer.key : null;
 
           // Extract Photo Gallery Backdrops (HD 6 to 8 images)
@@ -1776,19 +1782,33 @@
           };
         };
 
+        const savedScrollY = ref(0);
+
+        const restoreScrollPosition = () => {
+          nextTick(() => {
+            setTimeout(() => {
+              window.scrollTo({ top: savedScrollY.value || 0, behavior: 'instant' });
+            }, 50);
+          });
+        };
+
         // Navigation & Hash Router
         const navigateTo = (tabName) => {
+          const wasInDetail = !!(selectedMedia.value || selectedPerson.value);
           selectedMedia.value = null;
           selectedPerson.value = null;
           activeTab.value = tabName;
           window.location.hash = `#${tabName}`;
-          window.scrollTo({ top: 0, behavior: 'instant' });
+          if (wasInDetail) {
+            restoreScrollPosition();
+          } else {
+            window.scrollTo({ top: 0, behavior: 'instant' });
+          }
         };
 
         const updateRouteFromHash = () => {
           try {
             const hash = window.location.hash || '#home';
-            window.scrollTo({ top: 0, behavior: 'instant' });
 
             if (hash.startsWith('#media/')) {
               selectedPerson.value = null;
@@ -1796,6 +1816,7 @@
               if (!mediaId) {
                 selectedMedia.value = null;
                 activeTab.value = 'home';
+                restoreScrollPosition();
                 return;
               }
               const foundInCol = collection.value.find(i => i.id === mediaId);
@@ -1810,12 +1831,14 @@
               if (!personId) {
                 selectedPerson.value = null;
                 activeTab.value = 'home';
+                restoreScrollPosition();
                 return;
               }
               if (!selectedPerson.value || String(selectedPerson.value.id) !== personId) {
                 openPersonDetail(personId, false);
               }
             } else {
+              const wasInDetail = !!(selectedMedia.value || selectedPerson.value);
               selectedMedia.value = null;
               selectedPerson.value = null;
               const tabName = hash.replace('#', '').trim() || 'home';
@@ -1823,6 +1846,9 @@
                 activeTab.value = tabName;
               } else {
                 activeTab.value = 'home';
+              }
+              if (wasInDetail) {
+                restoreScrollPosition();
               }
             }
           } catch (e) {
@@ -1833,11 +1859,9 @@
           }
         };
 
-        const savedScrollY = ref(0);
-
         const openMediaDetail = async (item, updateHash = true) => {
           if (currentRoute.value === 'dashboard') {
-            savedScrollY.value = window.scrollY;
+            savedScrollY.value = window.scrollY || window.pageYOffset || 0;
           }
           selectedPerson.value = null;
           selectedMedia.value = item;
@@ -1862,7 +1886,7 @@
             return;
           }
           if (currentRoute.value === 'dashboard' || currentRoute.value === 'media') {
-            savedScrollY.value = window.scrollY;
+            savedScrollY.value = window.scrollY || window.pageYOffset || 0;
           }
           selectedMedia.value = null;
           isLoadingPerson.value = true;
@@ -1977,9 +2001,7 @@
           if (window.location.hash.startsWith('#actor/')) {
             window.history.back();
           }
-          nextTick(() => {
-            window.scrollTo({ top: savedScrollY.value, behavior: 'instant' });
-          });
+          restoreScrollPosition();
         };
 
         const fetchExtendedMediaDetails = async (item) => {
@@ -2008,9 +2030,7 @@
           if (window.location.hash.startsWith('#media/')) {
             window.history.back();
           }
-          nextTick(() => {
-            window.scrollTo({ top: savedScrollY.value, behavior: 'instant' });
-          });
+          restoreScrollPosition();
         };
 
         const fetchMediaByIdAndOpen = async (mediaId) => {

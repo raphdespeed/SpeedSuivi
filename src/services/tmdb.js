@@ -207,10 +207,16 @@ export function formatMediaItem(rawItem) {
     };
   });
 
-  // Extract Official YouTube Trailer Key
+  // Extract Official YouTube Trailer Key (Prioritize FR Trailer > EN Trailer > Any Trailer > Any Teaser > Any YouTube Video)
   const videoResults = rawItem.videos?.results || [];
-  const trailers = videoResults.filter(v => v.site === 'YouTube' && (v.type === 'Trailer' || v.type === 'Teaser'));
-  let selectedTrailer = trailers.find(v => v.iso_639_1 === 'fr') || trailers.find(v => v.iso_639_1 === 'en') || trailers[0];
+  const youtubeVideos = videoResults.filter(v => v && v.site === 'YouTube');
+  let selectedTrailer = 
+    youtubeVideos.find(v => v.type === 'Trailer' && v.iso_639_1 === 'fr') ||
+    youtubeVideos.find(v => v.type === 'Trailer' && v.iso_639_1 === 'en') ||
+    youtubeVideos.find(v => v.type === 'Trailer') ||
+    youtubeVideos.find(v => v.type === 'Teaser' && v.iso_639_1 === 'fr') ||
+    youtubeVideos.find(v => v.type === 'Teaser') ||
+    youtubeVideos[0];
   const trailerKey = selectedTrailer ? selectedTrailer.key : null;
 
   // Extract Photo Gallery Backdrops (HD 6 to 8 images)
