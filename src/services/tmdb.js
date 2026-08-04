@@ -95,6 +95,22 @@ export async function getMediaDetails(id, mediaType) {
     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
     const data = await response.json();
 
+    // Fallback: If videos.results is empty, do a dedicated videos call with FR/EN/null languages
+    if (!data.videos?.results || data.videos.results.length === 0) {
+      try {
+        const vUrl = `${BASE_URL}/${type}/${id}/videos?include_video_language=fr,en,null`;
+        const vRes = await fetch(vUrl);
+        if (vRes.ok) {
+          const vData = await vRes.json();
+          if (vData.results && vData.results.length > 0) {
+            data.videos = vData;
+          }
+        }
+      } catch (ve) {
+        console.warn('Dedicated videos fallback error:', ve);
+      }
+    }
+
     return formatMediaItem({ ...data, media_type: type });
   } catch (error) {
     console.error('TMDB Details Error:', error);

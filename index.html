@@ -1784,11 +1784,25 @@
 
         const savedScrollY = ref(0);
 
+        const saveScrollPosition = () => {
+          if (currentRoute.value === 'dashboard') {
+            const y = window.scrollY || window.pageYOffset || 0;
+            savedScrollY.value = y;
+            sessionStorage.setItem('dashboard_scroll', String(y));
+          }
+        };
+
         const restoreScrollPosition = () => {
           nextTick(() => {
-            setTimeout(() => {
-              window.scrollTo({ top: savedScrollY.value || 0, behavior: 'instant' });
-            }, 50);
+            requestAnimationFrame(() => {
+              setTimeout(() => {
+                const savedY = sessionStorage.getItem('dashboard_scroll') || savedScrollY.value || 0;
+                const topPos = parseInt(savedY, 10);
+                if (!isNaN(topPos) && topPos > 0) {
+                  window.scrollTo({ top: topPos, behavior: 'instant' });
+                }
+              }, 150);
+            });
           });
         };
 
@@ -1860,9 +1874,7 @@
         };
 
         const openMediaDetail = async (item, updateHash = true) => {
-          if (currentRoute.value === 'dashboard') {
-            savedScrollY.value = window.scrollY || window.pageYOffset || 0;
-          }
+          saveScrollPosition();
           selectedPerson.value = null;
           selectedMedia.value = item;
           modalStatus.value = item.status || 'in_progress';
@@ -1885,9 +1897,7 @@
             selectedPerson.value = null;
             return;
           }
-          if (currentRoute.value === 'dashboard' || currentRoute.value === 'media') {
-            savedScrollY.value = window.scrollY || window.pageYOffset || 0;
-          }
+          saveScrollPosition();
           selectedMedia.value = null;
           isLoadingPerson.value = true;
           showFullBio.value = false;
@@ -2012,6 +2022,22 @@
             if (!res.ok) return;
             const data = await res.json();
             
+            // Dedicated videos fallback if videos.results is empty
+            if (!data.videos?.results || data.videos.results.length === 0) {
+              try {
+                const vUrl = `${BASE_URL}/${type}/${item.tmdbId}/videos?include_video_language=fr,en,null`;
+                const vRes = await fetch(vUrl);
+                if (vRes.ok) {
+                  const vData = await vRes.json();
+                  if (vData.results && vData.results.length > 0) {
+                    data.videos = vData;
+                  }
+                }
+              } catch (ve) {
+                console.warn('Dedicated videos fallback error:', ve);
+              }
+            }
+
             const formatted = formatItem({ ...data, media_type: type });
             if (selectedMedia.value && selectedMedia.value.id === item.id) {
               selectedMedia.value.cast = formatted.cast;
@@ -2041,6 +2067,15 @@
             const res = await fetch(`${BASE_URL}/${typeUrl}/${tmdbId}?language=fr-FR&append_to_response=credits,aggregate_credits,videos,images&include_image_language=fr,null,en`);
             const raw = await res.json();
             if (raw && raw.id) {
+              if (!raw.videos?.results || raw.videos.results.length === 0) {
+                try {
+                  const vRes = await fetch(`${BASE_URL}/${typeUrl}/${tmdbId}/videos?include_video_language=fr,en,null`);
+                  if (vRes.ok) {
+                    const vData = await vRes.json();
+                    if (vData.results && vData.results.length > 0) raw.videos = vData;
+                  }
+                } catch (ve) {}
+              }
               const formatted = formatItem({ ...raw, media_type: typeUrl });
               openMediaDetail(formatted, false);
             }
