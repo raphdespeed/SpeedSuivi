@@ -158,3 +158,30 @@ export function formatMediaItem(rawItem) {
     })) : []
   };
 }
+
+/**
+ * Returns the language status: 'VF' | 'VF / VOSTFR' | 'VO'
+ */
+export function getLanguageStatus(item) {
+  if (!item) return 'VO';
+  const origLang = item.originalLanguage || item.original_language || '';
+
+  if (origLang === 'fr') {
+    return 'VF';
+  }
+
+  const translationsList = item.translations?.translations || (Array.isArray(item.translations) ? item.translations : null);
+  if (translationsList && translationsList.length > 0) {
+    const frTrans = translationsList.find(t => t.iso_639_1 === 'fr');
+    if (frTrans) {
+      return 'VF / VOSTFR';
+    }
+    return 'VO';
+  }
+
+  if (origLang && origLang !== 'fr') {
+    return 'VF / VOSTFR';
+  }
+
+  return 'VO';
+}

@@ -1518,17 +1518,13 @@
           if (translationsList && translationsList.length > 0) {
             const frTrans = translationsList.find(t => t.iso_639_1 === 'fr');
             if (frTrans) {
-              const data = frTrans.data || {};
-              if (data.title || data.name || data.overview) {
-                return 'VOSTFR';
-              }
-              return 'VOSTFR';
+              return 'VF / VOSTFR';
             }
             return 'VO';
           }
 
           if (origLang && origLang !== 'fr') {
-            return 'VOSTFR';
+            return 'VF / VOSTFR';
           }
 
           return 'VO';
@@ -1537,7 +1533,7 @@
         const getLanguageBadgeClass = (item) => {
           const status = getLanguageStatus(item);
           if (status === 'VF') return 'bg-emerald-600/90 text-white border-emerald-400/40';
-          if (status === 'VOSTFR') return 'bg-amber-600/90 text-white border-amber-400/40';
+          if (status === 'VF / VOSTFR') return 'bg-amber-600/90 text-white border-amber-400/40';
           return 'bg-slate-600/90 text-gray-200 border-slate-400/40';
         };
 
