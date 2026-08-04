@@ -8,10 +8,12 @@ const CLIENT_ID = '603945258667-0a9970mtho016qrg3tpv5vqcgupsaqk3.apps.googleuser
 const SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
 const FILE_NAME = 'speedsuivi_data.json';
 const TOKEN_KEY = 'speedsuivi_gdrive_token';
+const EXPIRY_KEY = 'speedsuivi_gdrive_expiry';
 const USER_KEY = 'speedsuivi_gdrive_user';
 
 let tokenClient = null;
 let accessToken = null;
+let tokenExpiryTime = 0;
 let driveFileId = null;
 let saveDebounceTimer = null;
 
@@ -24,11 +26,52 @@ export const driveState = {
 };
 
 /**
+ * Ensure token is still valid before calling Drive APIs.
+ * Performs silent token refresh if expired.
+ */
+async function ensureValidToken() {
+  if (!accessToken) return false;
+
+  const now = Date.now();
+  if (tokenExpiryTime && now < tokenExpiryTime) {
+    return true;
+  }
+
+  // Token expired -> Attempt Silent Refresh via GIS prompt: ''
+  if (tokenClient) {
+    return new Promise((resolve) => {
+      try {
+        tokenClient.requestAccessToken({ prompt: '' });
+        setTimeout(() => {
+          if (accessToken && Date.now() < tokenExpiryTime) {
+            resolve(true);
+          } else {
+            console.warn('Silent token refresh expired. Re-auth required.');
+            accessToken = null;
+            sessionStorage.removeItem(TOKEN_KEY);
+            sessionStorage.removeItem(EXPIRY_KEY);
+            driveState.isConnected = false;
+            resolve(false);
+          }
+        }, 1500);
+      } catch (e) {
+        accessToken = null;
+        driveState.isConnected = false;
+        resolve(false);
+      }
+    });
+  }
+
+  return true;
+}
+
+/**
  * Initialize Google Token Client via Google Identity Services (GIS)
  */
 export function initDriveSync(onStatusChange, onDataReceived) {
-  // Restore cached session token if available
+  // Restore cached session token and expiry if available
   const cachedToken = sessionStorage.getItem(TOKEN_KEY);
+  const cachedExpiry = sessionStorage.getItem(EXPIRY_KEY);
   const cachedUser = localStorage.getItem(USER_KEY);
 
   if (cachedUser) {
@@ -39,8 +82,13 @@ export function initDriveSync(onStatusChange, onDataReceived) {
 
   if (cachedToken) {
     accessToken = cachedToken;
-    driveState.isConnected = true;
-    if (onStatusChange) onStatusChange(driveState);
+    tokenExpiryTime = parseInt(cachedExpiry, 10) || 0;
+    
+    // Check if token expired
+    if (Date.now() < tokenExpiryTime) {
+      driveState.isConnected = true;
+      if (onStatusChange) onStatusChange(driveState);
+    }
   }
 
   const checkGISLoaded = () => {
@@ -53,16 +101,22 @@ export function initDriveSync(onStatusChange, onDataReceived) {
             console.error('OAuth Error:', response.error);
             driveState.error = response.error;
             driveState.isSyncing = false;
+            driveState.isConnected = false;
             if (onStatusChange) onStatusChange(driveState);
             return;
           }
 
           accessToken = response.access_token;
+          const expiresIn = response.expires_in || 3590;
+          tokenExpiryTime = Date.now() + (expiresIn - 60) * 1000;
+
           sessionStorage.setItem(TOKEN_KEY, accessToken);
+          sessionStorage.setItem(EXPIRY_KEY, String(tokenExpiryTime));
+
           driveState.isConnected = true;
           driveState.error = null;
 
-          // Fetch basic user profile using Google userInfo
+          // Fetch user profile using Google userInfo API
           try {
             const userRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
               headers: { Authorization: `Bearer ${accessToken}` }
@@ -88,6 +142,11 @@ export function initDriveSync(onStatusChange, onDataReceived) {
           }
         }
       });
+
+      // If we had a cached token, attempt a silent validation/refresh
+      if (cachedToken && Date.now() >= tokenExpiryTime) {
+        tokenClient.requestAccessToken({ prompt: '' });
+      }
     } else {
       setTimeout(checkGISLoaded, 300);
     }
@@ -116,7 +175,9 @@ export function logoutGoogleDrive(onStatusChange) {
   }
   accessToken = null;
   driveFileId = null;
+  tokenExpiryTime = 0;
   sessionStorage.removeItem(TOKEN_KEY);
+  sessionStorage.removeItem(EXPIRY_KEY);
   localStorage.removeItem(USER_KEY);
 
   driveState.isConnected = false;
@@ -132,7 +193,8 @@ export function logoutGoogleDrive(onStatusChange) {
  * Search for existing speedsuivi_data.json file in appDataFolder
  */
 async function findDriveFile() {
-  if (!accessToken) return null;
+  const isValid = await ensureValidToken();
+  if (!isValid) return null;
   try {
     const url = `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name%3D%27${FILE_NAME}%27%20and%20trashed%3Dfalse`;
     const res = await fetch(url, {
@@ -140,7 +202,6 @@ async function findDriveFile() {
     });
     if (!res.ok) {
       if (res.status === 401) {
-        // Token expired
         driveState.isConnected = false;
         sessionStorage.removeItem(TOKEN_KEY);
       }
@@ -161,7 +222,8 @@ async function findDriveFile() {
  * Download collection data from Drive file
  */
 async function downloadDriveFile(fileId) {
-  if (!accessToken || !fileId) return null;
+  const isValid = await ensureValidToken();
+  if (!isValid || !fileId) return null;
   try {
     const url = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`;
     const res = await fetch(url, {
@@ -179,7 +241,8 @@ async function downloadDriveFile(fileId) {
  * Create a new file in appDataFolder
  */
 async function createDriveFile(collection) {
-  if (!accessToken) return null;
+  const isValid = await ensureValidToken();
+  if (!isValid) return null;
   try {
     const metadata = {
       name: FILE_NAME,
@@ -210,7 +273,8 @@ async function createDriveFile(collection) {
  * Update existing file content in Drive
  */
 async function updateDriveFile(fileId, collection) {
-  if (!accessToken || !fileId) return false;
+  const isValid = await ensureValidToken();
+  if (!isValid || !fileId) return false;
   try {
     const fileContent = JSON.stringify(collection, null, 2);
     const res = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
@@ -229,19 +293,24 @@ async function updateDriveFile(fileId, collection) {
 }
 
 /**
- * Merge local collection with remote collection (backward compatibility & conflict resolution)
+ * Intelligent Conflict Resolution Engine
+ * Merges local and remote collections based on item ID and latest updatedAt timestamp.
+ * Protects un-synced offline local items from being overwritten.
  */
 export function mergeCollections(localItems, remoteItems) {
   const map = new Map();
 
+  // 1. Load local items
   (localItems || []).forEach(item => {
     if (item && item.id) {
       map.set(item.id, { ...item });
     }
   });
 
+  // 2. Merge remote items intelligently
   (remoteItems || []).forEach(remoteItem => {
     if (!remoteItem || !remoteItem.id) return;
+    
     if (!map.has(remoteItem.id)) {
       map.set(remoteItem.id, { ...remoteItem });
     } else {
@@ -251,6 +320,8 @@ export function mergeCollections(localItems, remoteItems) {
 
       if (remoteTime > localTime) {
         map.set(remoteItem.id, { ...localItem, ...remoteItem });
+      } else {
+        map.set(remoteItem.id, { ...remoteItem, ...localItem });
       }
     }
   });
@@ -299,6 +370,66 @@ export async function syncWithDrive(onDataReceived, onStatusChange) {
 }
 
 /**
+ * Force Downward Sync (Cloud -> Local)
+ */
+export async function forcePullFromDrive(onDataReceived, onStatusChange) {
+  const isValid = await ensureValidToken();
+  if (!isValid) {
+    throw new Error("Non connecté à Google Drive ou session expirée.");
+  }
+  driveState.isSyncing = true;
+  if (onStatusChange) onStatusChange(driveState);
+
+  try {
+    if (!driveFileId) driveFileId = await findDriveFile();
+    if (!driveFileId) {
+      throw new Error("Aucun fichier distant trouvé sur Google Drive.");
+    }
+
+    const remoteCollection = await downloadDriveFile(driveFileId);
+    if (!Array.isArray(remoteCollection)) {
+      throw new Error("Fichier distant corrompu ou au format invalide.");
+    }
+
+    localStorage.setItem('media_tracker_v2', JSON.stringify(remoteCollection));
+    driveState.lastSyncTime = new Date();
+    if (onDataReceived) onDataReceived(remoteCollection);
+    return remoteCollection.length;
+  } finally {
+    driveState.isSyncing = false;
+    if (onStatusChange) onStatusChange(driveState);
+  }
+}
+
+/**
+ * Force Upward Sync (Local -> Cloud)
+ */
+export async function forcePushToDrive(currentCollection, onStatusChange) {
+  const isValid = await ensureValidToken();
+  if (!isValid) {
+    throw new Error("Non connecté à Google Drive ou session expirée.");
+  }
+  driveState.isSyncing = true;
+  if (onStatusChange) onStatusChange(driveState);
+
+  try {
+    if (!driveFileId) driveFileId = await findDriveFile();
+
+    if (driveFileId) {
+      await updateDriveFile(driveFileId, currentCollection);
+    } else {
+      driveFileId = await createDriveFile(currentCollection);
+    }
+
+    driveState.lastSyncTime = new Date();
+    return currentCollection.length;
+  } finally {
+    driveState.isSyncing = false;
+    if (onStatusChange) onStatusChange(driveState);
+  }
+}
+
+/**
  * Debounced Save to Google Drive (1.5s) on user data modification
  */
 export function triggerAutoSaveToDrive(currentCollection, onStatusChange) {
@@ -310,6 +441,9 @@ export function triggerAutoSaveToDrive(currentCollection, onStatusChange) {
     if (onStatusChange) onStatusChange(driveState);
 
     try {
+      const isValid = await ensureValidToken();
+      if (!isValid) return;
+
       if (!driveFileId) {
         driveFileId = await findDriveFile();
       }
