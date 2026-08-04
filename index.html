@@ -1004,9 +1004,23 @@
     </nav>
     </div>
 
-    <!-- ================= ROUTE 2: FULL PAGE MEDIA DETAIL VIEW ================= -->
+    <!-- ================= ROUTE 2: FULL PAGE MEDIA DETAIL VIEW (FIXED HERO BACKDROP & SLIDING CONTENT) ================= -->
     <div v-else-if="currentRoute === 'media'" class="min-h-screen bg-darkBg text-white flex flex-col flex-1 pb-24 animate-fadeIn relative z-40" key="media-view">
       
+      <!-- Fixed Background Hero Backdrop Image (70vh fixed layer) -->
+      <div 
+        v-if="selectedMedia.backdropPath"
+        class="fixed top-0 left-0 w-full h-[70vh] z-0 pointer-events-none overflow-hidden"
+        style="mask-image: linear-gradient(to bottom, black 55%, transparent 100%); -webkit-mask-image: linear-gradient(to bottom, black 55%, transparent 100%);"
+      >
+        <img 
+          :src="selectedMedia.backdropPath" 
+          :alt="selectedMedia.title" 
+          class="w-full h-full object-cover object-top opacity-55"
+        />
+        <div class="absolute inset-0 bg-gradient-to-b from-darkBg/40 via-transparent to-darkBg"></div>
+      </div>
+
       <!-- Sticky Top Back Bar -->
       <div class="sticky top-[72px] left-4 md:top-[72px] md:left-8 z-50 px-4 md:px-8">
         <button 
@@ -1018,19 +1032,18 @@
         </button>
       </div>
 
-      <!-- Hero Backdrop Header (min-h: 480px) -->
-      <div 
-        class="min-h-[480px] h-[480px] md:h-[560px] bg-cover bg-top relative flex items-end p-6 md:p-12 shrink-0 border-b border-white/10 -mt-14"
-        :style="{ backgroundImage: selectedMedia.backdropPath ? `linear-gradient(to bottom, rgba(11, 13, 18, 0.15) 0%, rgba(11, 13, 18, 0.5) 50%, rgba(11, 13, 18, 1) 100%), url('${selectedMedia.backdropPath}')` : 'none' }"
-      >
-        <div class="max-w-6xl mx-auto w-full flex flex-col md:flex-row gap-6 md:gap-8 items-end transform translate-y-16 md:translate-y-20 z-10">
+      <!-- Main Detail Content Container (Superposed & Sliding Over Fixed Backdrop) -->
+      <div class="relative z-10 max-w-6xl mx-auto w-full px-4 md:px-8 space-y-8 flex-1 mt-[25vh] md:mt-[32vh]">
+        
+        <!-- Header Card: Poster + Title + Badges -->
+        <div class="flex flex-col md:flex-row gap-6 md:gap-8 items-end bg-black/60 backdrop-blur-xl p-6 md:p-8 rounded-3xl border border-white/10 shadow-2xl">
           <img 
             :src="selectedMedia.posterPath" 
             :alt="selectedMedia.title" 
             @error="handleImgError($event, selectedMedia.title)"
-            class="w-36 md:w-52 aspect-[2/3] object-cover rounded-2xl border-4 border-white/20 shadow-2xl shrink-0" 
+            class="w-36 md:w-52 aspect-[2/3] object-cover rounded-2xl border-4 border-white/20 shadow-2xl shrink-0 -mt-16 md:-mt-24" 
           />
-          <div class="space-y-2 flex-1 min-w-0 pb-2">
+          <div class="space-y-3 flex-1 min-w-0">
             <div class="flex flex-wrap gap-2 items-center">
               <span :class="['text-xs font-heading font-bold px-3 py-1 rounded-full shadow-lg', selectedMedia.category === 'kdrama' ? 'bg-pink-600 text-white' : selectedMedia.category === 'anime' ? 'bg-purple-600 text-white' : 'bg-netflixRed text-white']">
                 {{ getCategoryBadge(selectedMedia.category) }}
@@ -1057,10 +1070,6 @@
             </p>
           </div>
         </div>
-      </div>
-
-      <!-- Main Detail Content Area -->
-      <div class="max-w-6xl mx-auto w-full px-4 md:px-8 pt-24 md:pt-28 space-y-8 flex-1">
         
         <!-- Stream Platforms Section in France -->
         <div class="space-y-3 bg-cardBg/60 p-5 rounded-2xl border border-white/10 backdrop-blur-md shadow-xl">
@@ -2829,8 +2838,27 @@
           });
 
           if ('serviceWorker' in navigator) {
+            let refreshing = false;
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+              if (!refreshing) {
+                refreshing = true;
+                window.location.reload();
+              }
+            });
+
             window.addEventListener('load', () => {
-              navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW reg error:', err));
+              navigator.serviceWorker.register('./sw.js').then(reg => {
+                reg.addEventListener('updatefound', () => {
+                  const newWorker = reg.installing;
+                  if (newWorker) {
+                    newWorker.addEventListener('statechange', () => {
+                      if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                        showToast('Mise à jour v1.3.6 disponible ! Rechargement...', 'info');
+                      }
+                    });
+                  }
+                });
+              }).catch(err => console.log('SW reg error:', err));
             });
           }
 
