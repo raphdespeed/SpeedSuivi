@@ -4,6 +4,14 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   
+  <!-- PWA & Mobile Web App Meta -->
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#0b0d12" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="SpeedSuivi" />
+  <link rel="apple-touch-icon" href="assets/icon-192.png" />
+
   <!-- Titre et Description standard -->
   <title>SpeedSuivi - Suivi de Films, Séries, Animés & K-Dramas</title>
   <meta name="description" content="Suivez facilement l'avancement de vos séries, animés et films préférés épisode par épisode !" />
@@ -227,8 +235,17 @@
           </button>
         </nav>
 
-        <!-- Export / Import Actions -->
+        <!-- Export / Import / PWA Actions -->
         <div class="flex items-center gap-2">
+          <button 
+            v-if="canInstallPwa"
+            @click="installPWA"
+            class="text-xs font-heading font-bold px-3 py-1.5 rounded-lg bg-netflixRed hover:bg-netflixRedHover text-white shadow-lg shadow-netflixRed/30 transition-all flex items-center gap-1.5 animate-pulse"
+            title="Installer SpeedSuivi sur votre écran d'accueil"
+          >
+            <span>📱</span> <span class="hidden sm:inline">Installer l'App</span>
+          </button>
+
           <button 
             @click="exportJSON"
             class="text-xs font-heading font-semibold px-3 py-1.5 rounded-lg border border-white/10 text-gray-300 hover:bg-white/10 hover:text-white transition-all flex items-center gap-1.5"
@@ -1096,14 +1113,30 @@
 
           <!-- Season / Episode Number Inputs -->
           <div v-if="selectedMedia.mediaType !== 'movie'" class="flex flex-wrap gap-6 pt-4 border-t border-white/10 items-center justify-between">
+            <!-- Saison Incremental Controls -->
             <div class="flex items-center gap-3">
               <label class="text-xs font-heading font-bold text-gray-300 uppercase">Saison :</label>
-              <input 
-                type="number" 
-                min="1" 
-                v-model.number="modalSeason" 
-                class="w-20 bg-surfaceBg border border-white/15 rounded-xl px-3 py-2 text-sm font-bold text-white text-center focus:outline-none focus:border-netflixRed"
-              />
+              <div class="flex items-center gap-1.5">
+                <button 
+                  @click="changeModalSeason(-1)"
+                  class="w-9 h-9 rounded-lg bg-surfaceBg border border-white/15 hover:bg-netflixRed text-white text-lg font-bold flex items-center justify-center transition-colors"
+                  title="Saison précédente"
+                >-</button>
+                <input 
+                  type="number" 
+                  min="1" 
+                  :max="selectedMedia.totalSeasons || 99" 
+                  v-model.number="modalSeason" 
+                  @input="onModalSeasonChange"
+                  class="w-20 bg-surfaceBg border border-white/15 rounded-xl px-2 py-2 text-sm font-bold text-white text-center focus:outline-none focus:border-netflixRed"
+                />
+                <button 
+                  @click="changeModalSeason(1)"
+                  class="w-9 h-9 rounded-lg bg-surfaceBg border border-white/15 hover:bg-netflixRed text-white text-lg font-bold flex items-center justify-center transition-colors"
+                  title="Saison suivante"
+                >+</button>
+              </div>
+              <span v-if="selectedMedia.totalSeasons" class="text-xs text-gray-400 font-semibold">/ {{ selectedMedia.totalSeasons }} saisons</span>
             </div>
 
             <div class="flex items-center gap-3">
@@ -1597,6 +1630,43 @@
         const toasts = ref([]);
         let debounceTimer = null;
 
+        const deferredPrompt = ref(null);
+        const canInstallPwa = ref(false);
+
+        const installPWA = async () => {
+          if (!deferredPrompt.value) return;
+          deferredPrompt.value.prompt();
+          const { outcome } = await deferredPrompt.value.userChoice;
+          if (outcome === 'accepted') {
+            showToast('SpeedSuivi installé avec succès sur votre appareil ! 🚀', 'success');
+          }
+          deferredPrompt.value = null;
+          canInstallPwa.value = false;
+        };
+
+        const changeModalSeason = (delta) => {
+          if (!selectedMedia.value) return;
+          const maxSeasons = selectedMedia.value.totalSeasons || 99;
+          let next = (modalSeason.value || 1) + delta;
+          next = Math.max(1, Math.min(maxSeasons, next));
+          modalSeason.value = next;
+          onModalSeasonChange();
+        };
+
+        const onModalSeasonChange = () => {
+          if (!selectedMedia.value) return;
+          const maxSeasons = selectedMedia.value.totalSeasons || 99;
+          if (modalSeason.value < 1) modalSeason.value = 1;
+          if (modalSeason.value > maxSeasons) modalSeason.value = maxSeasons;
+
+          if (selectedMedia.value.seasonsEpisodesMap && selectedMedia.value.seasonsEpisodesMap[modalSeason.value]) {
+            selectedMedia.value.totalEpisodes = selectedMedia.value.seasonsEpisodesMap[modalSeason.value];
+            if (modalEpisode.value > selectedMedia.value.totalEpisodes) {
+              modalEpisode.value = selectedMedia.value.totalEpisodes;
+            }
+          }
+        };
+
         const formatDate = (dateStr) => {
           if (!dateStr) return '';
           const [year, month, day] = dateStr.split('-');
@@ -1759,6 +1829,16 @@
             thumb: `https://image.tmdb.org/t/p/w780${img.file_path}`
           }));
 
+          // Extract Seasons Episodes Map
+          const seasonsEpisodesMap = {};
+          if (raw.seasons && Array.isArray(raw.seasons)) {
+            raw.seasons.forEach(s => {
+              if (s.season_number > 0) {
+                seasonsEpisodesMap[s.season_number] = s.episode_count || 12;
+              }
+            });
+          }
+
           return {
             id: `${isMovie ? 'movie' : 'tv'}_${raw.id}`,
             tmdbId: raw.id,
@@ -1778,6 +1858,7 @@
             galleryImages: galleryImages,
             totalSeasons: raw.number_of_seasons || 1,
             totalEpisodes: raw.number_of_episodes || (isMovie ? 1 : 12),
+            seasonsEpisodesMap: seasonsEpisodesMap,
             isFavorite: raw.isFavorite || false,
             providers: [],
             providersLoaded: false
@@ -2741,6 +2822,18 @@
         });
 
         onMounted(() => {
+          window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt.value = e;
+            canInstallPwa.value = true;
+          });
+
+          if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+              navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW reg error:', err));
+            });
+          }
+
           loadCollection();
           fetchRecentReleases();
           fetchDiscoveryContent(1);
@@ -2792,6 +2885,10 @@
           modalRecommendations,
           isLoadingRecommendations,
           toasts,
+          canInstallPwa,
+          installPWA,
+          changeModalSeason,
+          onModalSeasonChange,
 
           countInProgress,
           countWatchlist,
