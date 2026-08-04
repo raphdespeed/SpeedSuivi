@@ -29,6 +29,14 @@ export const driveState = {
 };
 
 /**
+ * Detect mobile environment (phones & tablets) to avoid silent token refresh popups.
+ */
+function isMobileDevice() {
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+    || (navigator.maxTouchPoints && navigator.maxTouchPoints > 2 && /MacIntel/.test(navigator.platform));
+}
+
+/**
  * Save active token info into localStorage ({ accessToken, expiresAt })
  */
 function saveTokenInfo(token, expiresInSeconds) {
@@ -175,7 +183,8 @@ function setupTokenClient(onDataReceived, onStatusChange) {
 
 /**
  * Proactively check if token is valid or expiring within 5 minutes.
- * Performs silent refresh ONLY when an active user session token exists.
+ * On MOBILE: never attempt silent requestAccessToken (causes popup/spinner loops).
+ * On DESKTOP: attempt silent refresh only during active API calls.
  */
 async function ensureValidToken() {
   if (!accessToken) return false;
@@ -188,7 +197,17 @@ async function ensureValidToken() {
     return true;
   }
 
-  // Token expiring soon -> Attempt silent refresh during active API calls
+  // On mobile, NEVER attempt silent refresh — it triggers popup/spinner
+  if (isMobileDevice()) {
+    console.warn('Mobile detected: skipping silent token refresh. Token may be expiring.');
+    // If token still technically valid (just under 5 min), allow the request
+    if (tokenExpiryTime && tokenExpiryTime > now) {
+      return true;
+    }
+    return false;
+  }
+
+  // Desktop only: Token expiring soon -> Attempt silent refresh
   if (tokenClient) {
     return new Promise((resolve) => {
       try {
@@ -333,10 +352,13 @@ export function initDriveSync(onStatusChange, onDataReceived) {
       if (onStatusChange) onStatusChange(driveState);
     }
 
-    // 3. Actively ensure GIS script is loaded and initialize TokenClient
+    // 3. Pre-initialize TokenClient eagerly so it's ready for user click.
+    //    On mobile: do NOT call any requestAccessToken here.
+    //    The tokenClient must be ready BEFORE user taps "Se connecter".
     ensureGISLoaded(3000).then((isLoaded) => {
       if (isLoaded) {
         setupTokenClient(onDataReceived, onStatusChange);
+        console.log('GIS TokenClient pre-initialized and ready for user gesture.');
       }
     });
   } catch (initErr) {
@@ -347,18 +369,25 @@ export function initDriveSync(onStatusChange, onDataReceived) {
 }
 
 /**
- * Trigger explicit OAuth login flow with user consent upon explicit click
+ * Trigger explicit OAuth login flow with user consent upon explicit click/tap.
+ * CRITICAL: This function must be SYNCHRONOUS up to requestAccessToken()
+ * to preserve the user-gesture context required by mobile browsers.
+ * No async/await or Promise before the popup trigger.
  */
-export async function loginGoogleDrive(onDataReceived, onStatusChange) {
+export function loginGoogleDrive(onDataReceived, onStatusChange) {
   try {
-    const isReady = await ensureGISLoaded(2000);
-    if (isReady && !tokenClient) {
-      setupTokenClient(onDataReceived, onStatusChange || statusChangeCallback);
+    // Synchronous check: if tokenClient not ready, try setup immediately
+    if (!tokenClient) {
+      if (window.google && window.google.accounts && window.google.accounts.oauth2) {
+        setupTokenClient(onDataReceived, onStatusChange || statusChangeCallback);
+      }
     }
 
     if (tokenClient) {
+      // MUST be called synchronously inside user gesture handler
       tokenClient.requestAccessToken({ prompt: 'consent' });
     } else {
+      // GIS SDK not loaded yet — inform user
       alert("Le service Google Identity n'est pas encore prêt. Veuillez recharger la page ou réessayer dans un instant.");
     }
   } catch (e) {
