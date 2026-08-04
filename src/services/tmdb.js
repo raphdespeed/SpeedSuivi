@@ -113,9 +113,31 @@ export async function getPersonDetails(personId) {
     const data = await response.json();
 
     const rawCast = data.combined_credits?.cast || [];
-    const sortedFilmography = rawCast
-      .filter(item => item.poster_path)
+    const uniqueMap = new Map();
+    rawCast.forEach(item => {
+      if (item && item.poster_path) {
+        const key = `${item.media_type || 'tv'}_${item.id}`;
+        if (!uniqueMap.has(key)) {
+          uniqueMap.set(key, item);
+        }
+      }
+    });
+
+    const sortedFilmography = Array.from(uniqueMap.values())
+      .sort((a, b) => {
+        const dateStrA = a.release_date || a.first_air_date || '';
+        const dateStrB = b.release_date || b.first_air_date || '';
+        if (!dateStrA && !dateStrB) return 0;
+        if (!dateStrA) return 1;
+        if (!dateStrB) return -1;
+        return new Date(dateStrB).getTime() - new Date(dateStrA).getTime();
+      })
+      .map(formatMediaItem);
+
+    const famousWorks = [...rawCast]
+      .filter(item => item && item.poster_path)
       .sort((a, b) => (b.popularity || 0) - (a.popularity || 0))
+      .slice(0, 10)
       .map(formatMediaItem);
 
     const genderMap = { 1: 'Femme', 2: 'Homme' };
@@ -131,6 +153,7 @@ export async function getPersonDetails(personId) {
       knownForDepartment: data.known_for_department || 'Interprétation',
       totalCredits: rawCast.length,
       profilePath: data.profile_path ? `https://image.tmdb.org/t/p/w500${data.profile_path}` : null,
+      famousWorks: famousWorks,
       filmography: sortedFilmography
     };
   } catch (error) {

@@ -1432,14 +1432,14 @@
               class="known-for-carousel flex gap-4 overflow-x-auto pb-3 pt-1 scroll-smooth"
             >
               <div 
-                v-for="item in selectedPerson.filmography.slice(0, 10)" 
+                v-for="item in (selectedPerson?.famousWorks || selectedPerson?.filmography?.slice(0, 10))" 
                 :key="`famous_${item.id}`"
                 @click="openMediaDetail(item)"
                 class="known-for-card flex-none w-[140px] group cursor-pointer space-y-2"
               >
                 <div class="aspect-[2/3] bg-gray-900 rounded-xl overflow-hidden border border-white/10 relative group-hover:border-netflixRed group-hover:scale-105 transition-all shadow-xl">
                   <img :src="item.posterPath" :alt="item.title" @error="handleImgError($event, item.title)" class="w-full h-full object-cover" loading="lazy" />
-                  <div class="absolute top-2 left-2">
+                  <div class="absolute top-2 left-2 flex gap-1">
                     <span class="text-[10px] font-heading font-bold px-2 py-0.5 rounded bg-black/80 text-white">
                       {{ getCategoryBadge(item.category) }}
                     </span>
@@ -1455,7 +1455,7 @@
           <!-- "Interprétation / Filmographie" Section (Full Grid) -->
           <div class="space-y-4 pt-2 border-t border-white/10">
             <h3 class="text-lg font-heading font-bold text-white flex items-center justify-between">
-              <span class="flex items-center gap-2"><span>🎬</span> <span>Interprétation / Filmographie</span></span>
+              <span class="flex items-center gap-2"><span>🎬</span> <span>Interprétation / Filmographie (Tri Chronologique)</span></span>
               <span class="text-xs font-normal text-gray-400 font-body">({{ selectedPerson?.filmography ? selectedPerson.filmography.length : 0 }} titres)</span>
             </h3>
 
@@ -1468,11 +1468,13 @@
               >
                 <div class="relative aspect-[2/3] bg-gray-900 overflow-hidden">
                   <img :src="item.posterPath" :alt="item.title" @error="handleImgError($event, item.title)" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
-                  <div class="absolute top-2 left-2 flex gap-1">
+                  <div class="absolute top-2 left-2 flex gap-1 flex-wrap">
                     <span class="text-[10px] font-heading font-bold px-2 py-0.5 rounded bg-black/80 text-white">
                       {{ getCategoryBadge(item.category) }}
                     </span>
-                    <span v-if="item.year" class="text-[10px] font-heading px-1.5 py-0.5 rounded bg-black/60 text-gray-300">{{ item.year }}</span>
+                    <span v-if="item.year" class="text-[10px] font-heading font-bold px-1.5 py-0.5 rounded bg-black/80 text-netflixRed border border-netflixRed/30 shadow">
+                      {{ item.year }}
+                    </span>
                   </div>
                 </div>
                 <div class="p-3 flex flex-col flex-1">
@@ -1888,9 +1890,31 @@
             }
 
             const rawCast = data?.combined_credits?.cast || [];
-            const sortedFilmography = rawCast
+            const uniqueMap = new Map();
+            rawCast.forEach(item => {
+              if (item && item.poster_path) {
+                const key = `${item.media_type || 'tv'}_${item.id}`;
+                if (!uniqueMap.has(key)) {
+                  uniqueMap.set(key, item);
+                }
+              }
+            });
+
+            const sortedFilmography = Array.from(uniqueMap.values())
+              .sort((a, b) => {
+                const dateStrA = a.release_date || a.first_air_date || '';
+                const dateStrB = b.release_date || b.first_air_date || '';
+                if (!dateStrA && !dateStrB) return 0;
+                if (!dateStrA) return 1;
+                if (!dateStrB) return -1;
+                return new Date(dateStrB).getTime() - new Date(dateStrA).getTime();
+              })
+              .map(formatItem);
+
+            const famousWorks = [...rawCast]
               .filter(item => item && item.poster_path)
               .sort((a, b) => ((b && b.popularity) || 0) - ((a && a.popularity) || 0))
+              .slice(0, 10)
               .map(formatItem);
 
             const genderMap = { 1: 'Femme', 2: 'Homme' };
@@ -1906,6 +1930,7 @@
               knownForDepartment: data?.known_for_department || 'Interprétation',
               totalCredits: rawCast.length,
               profilePath: data?.profile_path ? `https://image.tmdb.org/t/p/w500${data.profile_path}` : null,
+              famousWorks: famousWorks,
               filmography: sortedFilmography
             };
           } catch (e) {
