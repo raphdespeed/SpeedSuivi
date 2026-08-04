@@ -1370,6 +1370,13 @@
                 if (shouldFetchMovies) {
                   movieUrl = `${BASE_URL}/discover/movie?with_origin_country=KR&with_original_language=ko&language=fr-FR&sort_by=popularity.desc&page=${page}${providerParam}${genreString}${movieYearParam}`;
                 }
+              } else if (activeFilter.value === 'anime') {
+                if (shouldFetchTV) {
+                  tvUrl = `${BASE_URL}/discover/tv?with_genres=16&with_origin_country=JP&language=fr-FR&sort_by=popularity.desc&page=${page}${providerParam}${tvYearParam}`;
+                }
+                if (shouldFetchMovies) {
+                  movieUrl = `${BASE_URL}/discover/movie?with_genres=16&with_origin_country=JP&language=fr-FR&sort_by=popularity.desc&page=${page}${providerParam}${movieYearParam}`;
+                }
               } else {
                 if (shouldFetchMovies) {
                   movieUrl = `${BASE_URL}/discover/movie?language=fr-FR&sort_by=popularity.desc&page=${page}${providerParam}${genreString}${movieYearParam}`;
@@ -1381,6 +1388,7 @@
             } else {
               // Default trending items
               const url = `${BASE_URL}/trending/all/week?language=fr-FR&page=${page}`;
+              console.log('TMDB Trending URL:', url);
               const res = await fetch(url);
               const data = await res.json();
               totalTrendingPages.value = data.total_pages || 1;
@@ -1397,6 +1405,9 @@
               items.forEach(item => enrichWatchProviders(item));
               return;
             }
+
+            if (movieUrl) console.log('TMDB Discover Movie URL:', movieUrl);
+            if (tvUrl) console.log('TMDB Discover TV URL:', tvUrl);
 
             const fetches = [];
             if (movieUrl) fetches.push(fetch(movieUrl).then(r => r.ok ? r.json() : { results: [], total_pages: 1 }).catch(() => ({ results: [], total_pages: 1 })));

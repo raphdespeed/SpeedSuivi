@@ -158,3 +158,109 @@ export function formatMediaItem(rawItem) {
     })) : []
   };
 }
+
+/**
+ * Discover media with custom TMDB provider, genre, year, and type filters
+ */
+export async function discoverMedia(options = {}) {
+  const {
+    category = 'all', // 'all' | 'series' | 'anime' | 'kdrama' | 'movie'
+    providerId = null,
+    genreId = 'all',
+    year = 'all',
+    page = 1
+  } = options;
+
+  let movieUrl = '';
+  let tvUrl = '';
+
+  const providerParam = providerId ? `&with_watch_providers=${providerId}&watch_region=FR` : '';
+  
+  const genreParams = [];
+  if (genreId && genreId !== 'all') {
+    genreParams.push(genreId);
+  }
+  if (category === 'anime') {
+    if (!genreParams.includes(16) && !genreParams.includes('16')) {
+      genreParams.push(16);
+    }
+  }
+
+  const genreString = genreParams.length > 0 ? `&with_genres=${genreParams.join(',')}` : '';
+  const movieYearParam = year && year !== 'all' ? `&primary_release_year=${year}` : '';
+  const tvYearParam = year && year !== 'all' ? `&first_air_date_year=${year}` : '';
+
+  const shouldFetchMovies = category === 'all' || category === 'movie' || category === 'anime';
+  const shouldFetchTV = category === 'all' || category === 'series' || category === 'anime' || category === 'kdrama';
+
+  if (category === 'kdrama') {
+    if (shouldFetchTV) {
+      tvUrl = `${BASE_URL}/discover/tv?with_origin_country=KR&with_original_language=ko&language=fr-FR&sort_by=popularity.desc&page=${page}${providerParam}${genreString}${tvYearParam}`;
+    }
+    if (shouldFetchMovies) {
+      movieUrl = `${BASE_URL}/discover/movie?with_origin_country=KR&with_original_language=ko&language=fr-FR&sort_by=popularity.desc&page=${page}${providerParam}${genreString}${movieYearParam}`;
+    }
+  } else if (category === 'anime') {
+    if (shouldFetchTV) {
+      tvUrl = `${BASE_URL}/discover/tv?with_genres=16&with_origin_country=JP&language=fr-FR&sort_by=popularity.desc&page=${page}${providerParam}${tvYearParam}`;
+    }
+    if (shouldFetchMovies) {
+      movieUrl = `${BASE_URL}/discover/movie?with_genres=16&with_origin_country=JP&language=fr-FR&sort_by=popularity.desc&page=${page}${providerParam}${movieYearParam}`;
+    }
+  } else {
+    if (shouldFetchMovies) {
+      movieUrl = `${BASE_URL}/discover/movie?language=fr-FR&sort_by=popularity.desc&page=${page}${providerParam}${genreString}${movieYearParam}`;
+    }
+    if (shouldFetchTV) {
+      tvUrl = `${BASE_URL}/discover/tv?language=fr-FR&sort_by=popularity.desc&page=${page}${providerParam}${genreString}${tvYearParam}`;
+    }
+  }
+
+  if (movieUrl) console.log('TMDB Discover Movie URL:', movieUrl);
+  if (tvUrl) console.log('TMDB Discover TV URL:', tvUrl);
+
+  const fetches = [];
+  if (movieUrl) {
+    fetches.push(
+      fetch(movieUrl)
+        .then(r => r.ok ? r.json() : { results: [], total_pages: 1 })
+        .catch(err => {
+          console.error('TMDB Discover Movie Fetch Error:', err);
+          return { results: [], total_pages: 1 };
+        })
+    );
+  } else {
+    fetches.push(Promise.resolve({ results: [], total_pages: 1 }));
+  }
+
+  if (tvUrl) {
+    fetches.push(
+      fetch(tvUrl)
+        .then(r => r.ok ? r.json() : { results: [], total_pages: 1 })
+        .catch(err => {
+          console.error('TMDB Discover TV Fetch Error:', err);
+          return { results: [], total_pages: 1 };
+        })
+    );
+  } else {
+    fetches.push(Promise.resolve({ results: [], total_pages: 1 }));
+  }
+
+  const [movieData, tvData] = await Promise.all(fetches);
+  const totalPages = Math.max(movieData.total_pages || 1, tvData.total_pages || 1);
+
+  const movies = (movieData.results || []).map(i => formatMediaItem({ ...i, media_type: 'movie' }));
+  const tvs = (tvData.results || []).map(i => formatMediaItem({ ...i, media_type: 'tv' }));
+
+  const combined = [];
+  const maxLen = Math.max(movies.length, tvs.length);
+  for (let i = 0; i < maxLen; i++) {
+    if (i < movies.length) combined.push(movies[i]);
+    if (i < tvs.length) combined.push(tvs[i]);
+  }
+
+  return {
+    results: combined,
+    totalPages: totalPages
+  };
+}
