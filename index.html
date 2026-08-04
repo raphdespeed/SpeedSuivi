@@ -105,8 +105,11 @@
 <body class="min-h-screen flex flex-col selection:bg-netflixRed selection:text-white">
 
   <div id="app" class="flex-1 flex flex-col">
-    <!-- Header Navigation Bar -->
-    <header class="sticky top-0 z-50 glass-header border-b border-white/10 px-4 py-3 md:px-8">
+
+    <!-- ================= ROUTE 3: MAIN DASHBOARD & SEARCH VIEW ================= -->
+    <div v-else class="flex-1 flex flex-col">
+      <!-- Header Navigation Bar -->
+      <header class="sticky top-0 z-50 glass-header border-b border-white/10 px-4 py-3 md:px-8">
       <div class="max-w-7xl mx-auto flex items-center justify-between gap-4">
         
         <!-- Logo -->
@@ -266,7 +269,7 @@
     </header>
 
     <!-- Main App Container -->
-    <main v-if="!selectedMedia" class="max-w-7xl w-full mx-auto p-4 md:p-8 flex-1 pb-24 md:pb-12">
+    <main class="max-w-7xl w-full mx-auto p-4 md:p-8 flex-1 pb-24 md:pb-12">
       
       <!-- ================= HOME PAGE (Nouveautés & Sorties Récentes) ================= -->
       <div v-if="activeTab === 'home'" class="space-y-10 animate-fadeIn">
@@ -937,9 +940,10 @@
         <span>Recherche</span>
       </button>
     </nav>
+    </div>
 
-    <!-- ================= FULL PAGE MEDIA DETAIL VIEW ================= -->
-    <div v-if="selectedMedia && !selectedPerson" class="min-h-screen bg-darkBg text-white flex flex-col flex-1 pb-24 animate-fadeIn relative z-40">
+    <!-- ================= ROUTE 2: FULL PAGE MEDIA DETAIL VIEW ================= -->
+    <div v-else-if="currentRoute === 'media'" class="min-h-screen bg-darkBg text-white flex flex-col flex-1 pb-24 animate-fadeIn relative z-40">
       
       <!-- Sticky Top Back Bar -->
       <div class="sticky top-4 left-4 md:top-6 md:left-8 z-50 px-4 md:px-8">
@@ -1217,8 +1221,8 @@
 
     </div>
 
-    <!-- ================= FULL PAGE PERSON / ACTOR VIEW ================= -->
-    <div v-if="selectedPerson && !selectedMedia" class="min-h-screen bg-darkBg text-white flex flex-col flex-1 pb-24 animate-fadeIn relative z-40">
+    <!-- ================= ROUTE 1: FULL PAGE PERSON / ACTOR VIEW (TMDB 2-COLUMNS STYLE) ================= -->
+    <div v-if="currentRoute === 'actor'" class="min-h-screen bg-darkBg text-white flex flex-col flex-1 pb-24 animate-fadeIn relative z-40">
       
       <!-- Sticky Top Back Bar -->
       <div class="sticky top-4 left-4 md:top-6 md:left-8 z-50 px-4 md:px-8">
@@ -1231,102 +1235,158 @@
         </button>
       </div>
 
-      <div class="max-w-6xl mx-auto w-full px-4 md:px-8 pt-8 space-y-8 flex-1">
+      <div v-if="isLoadingPerson" class="flex justify-center items-center flex-1 py-32">
+        <div class="w-12 h-12 border-4 border-white/10 border-t-netflixRed rounded-full animate-spin"></div>
+      </div>
+
+      <div v-else-if="selectedPerson" class="max-w-7xl mx-auto w-full px-4 md:px-8 pt-8 flex flex-col md:flex-row gap-8 md:gap-10 flex-1">
         
-        <!-- Header Info Card -->
-        <div class="bg-cardBg/80 border border-white/10 rounded-2xl p-6 md:p-8 backdrop-blur-md shadow-2xl flex flex-col md:flex-row gap-6 md:gap-8 items-center md:items-start">
-          <img 
-            v-if="selectedPerson.profilePath" 
-            :src="selectedPerson.profilePath" 
-            :alt="selectedPerson.name" 
-            class="w-40 md:w-56 aspect-[2/3] object-cover rounded-2xl border-4 border-white/20 shadow-2xl shrink-0" 
-          />
-          <div v-else class="w-40 md:w-56 aspect-[2/3] bg-gray-800 rounded-2xl border-4 border-white/20 shadow-2xl shrink-0 flex items-center justify-center text-5xl">
-            👤
+        <!-- LEFT COLUMN: Profile & Personal Info (~300px fixed width) -->
+        <aside class="w-full md:w-72 lg:w-80 shrink-0 space-y-6">
+          <!-- Profile Picture HD -->
+          <div class="aspect-[2/3] bg-surfaceBg rounded-2xl overflow-hidden border-2 border-white/15 shadow-2xl relative group">
+            <img 
+              v-if="selectedPerson.profilePath" 
+              :src="selectedPerson.profilePath" 
+              :alt="selectedPerson.name" 
+              class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
+            />
+            <div v-else class="w-full h-full flex items-center justify-center bg-gray-800 text-gray-400 text-6xl">
+              👤
+            </div>
           </div>
 
-          <div class="space-y-4 flex-1 text-center md:text-left">
-            <div>
-              <span class="bg-netflixRed text-white text-xs font-heading font-bold px-3 py-1 rounded-full uppercase tracking-wider">
-                {{ selectedPerson.knownForDepartment || 'Acteur / Actrice' }}
-              </span>
-              <h1 class="font-heading font-extrabold text-3xl md:text-4xl text-white mt-2 leading-tight">
-                {{ selectedPerson.name }}
-              </h1>
-            </div>
+          <!-- Personal Information Card -->
+          <div class="bg-cardBg/90 border border-white/10 rounded-2xl p-6 space-y-5 shadow-xl backdrop-blur-md">
+            <h3 class="text-sm font-heading font-extrabold text-white uppercase tracking-wider border-b border-white/10 pb-3 flex items-center gap-2">
+              <span>📋</span> <span>Informations personnelles</span>
+            </h3>
 
-            <!-- Meta details (Birth, Death, Place) -->
-            <div class="flex flex-wrap justify-center md:justify-start gap-4 text-xs md:text-sm text-gray-300 font-heading">
-              <div v-if="selectedPerson.birthday" class="flex items-center gap-1.5 bg-surfaceBg px-3 py-1.5 rounded-xl border border-white/10">
-                <span>🎂</span>
-                <span>Né(e) le : {{ formatDate(selectedPerson.birthday) }}</span>
-                <span v-if="getAge(selectedPerson.birthday, selectedPerson.deathday)" class="text-gray-400">({{ getAge(selectedPerson.birthday, selectedPerson.deathday) }} ans)</span>
+            <div class="space-y-4 text-xs md:text-sm font-body">
+              <div>
+                <span class="block text-xs font-heading font-bold text-gray-400 uppercase tracking-wider">Métier principal</span>
+                <span class="text-white font-semibold text-sm">{{ selectedPerson.knownForDepartment || 'Interprétation' }}</span>
               </div>
-              <div v-if="selectedPerson.deathday" class="flex items-center gap-1.5 bg-surfaceBg px-3 py-1.5 rounded-xl border border-white/10 text-red-400">
-                <span>🕊️</span>
-                <span>Décédé(e) le : {{ formatDate(selectedPerson.deathday) }}</span>
+
+              <div>
+                <span class="block text-xs font-heading font-bold text-gray-400 uppercase tracking-wider">Sexe</span>
+                <span class="text-white font-semibold text-sm">{{ selectedPerson.gender || 'Non spécifié' }}</span>
               </div>
-              <div v-if="selectedPerson.placeOfBirth" class="flex items-center gap-1.5 bg-surfaceBg px-3 py-1.5 rounded-xl border border-white/10">
-                <span>📍</span>
-                <span>{{ selectedPerson.placeOfBirth }}</span>
+
+              <div v-if="selectedPerson.birthday">
+                <span class="block text-xs font-heading font-bold text-gray-400 uppercase tracking-wider">Date de naissance</span>
+                <span class="text-white font-semibold text-sm">
+                  {{ formatDate(selectedPerson.birthday) }}
+                  <span v-if="getAge(selectedPerson.birthday, selectedPerson.deathday)" class="text-gray-400 text-xs ml-1">({{ getAge(selectedPerson.birthday, selectedPerson.deathday) }} ans)</span>
+                </span>
+              </div>
+
+              <div v-if="selectedPerson.deathday">
+                <span class="block text-xs font-heading font-bold text-gray-400 uppercase tracking-wider text-red-400">Date de décès</span>
+                <span class="text-red-400 font-semibold text-sm">{{ formatDate(selectedPerson.deathday) }}</span>
+              </div>
+
+              <div v-if="selectedPerson.placeOfBirth">
+                <span class="block text-xs font-heading font-bold text-gray-400 uppercase tracking-wider">Lieu de naissance</span>
+                <span class="text-white font-semibold text-sm leading-snug block">{{ selectedPerson.placeOfBirth }}</span>
+              </div>
+
+              <div>
+                <span class="block text-xs font-heading font-bold text-gray-400 uppercase tracking-wider">Nombre d'apparitions</span>
+                <span class="text-white font-semibold text-sm">{{ selectedPerson.totalCredits || (selectedPerson.filmography ? selectedPerson.filmography.length : 0) }} crédits</span>
               </div>
             </div>
-
-            <!-- Biography Block -->
-            <div class="space-y-2 pt-2 border-t border-white/10">
-              <h4 class="text-xs font-heading font-bold text-gray-400 uppercase tracking-wider">Biographie</h4>
-              <p :class="['text-sm text-gray-300 leading-relaxed font-body whitespace-pre-line', !showFullBio ? 'line-clamp-4' : '']">
-                {{ selectedPerson.biography || 'Aucune biographie disponible en français.' }}
-              </p>
-              <button 
-                v-if="selectedPerson.biography && selectedPerson.biography.length > 280" 
-                @click="showFullBio = !showFullBio"
-                class="text-xs font-heading font-bold text-netflixRed hover:underline transition-all"
-              >
-                {{ showFullBio ? 'Réduire' : 'Lire la suite...' }}
-              </button>
-            </div>
-
           </div>
-        </div>
+        </aside>
 
-        <!-- Filmography Section -->
-        <div class="space-y-4">
-          <h3 class="text-lg font-heading font-bold text-white flex items-center gap-2">
-            <span>🎬</span> <span>Filmographie ({{ selectedPerson.filmography ? selectedPerson.filmography.length : 0 }} œuvres)</span>
-          </h3>
-
-          <div v-if="isLoadingPerson" class="flex justify-center py-12">
-            <div class="w-10 h-10 border-4 border-white/10 border-t-netflixRed rounded-full animate-spin"></div>
+        <!-- RIGHT COLUMN: Name, Bio, Known For Carousel & Full Filmography -->
+        <main class="flex-1 min-w-0 space-y-8">
+          
+          <!-- Actor Name Title -->
+          <div class="space-y-1">
+            <h1 class="font-heading font-extrabold text-3xl md:text-5xl text-white tracking-tight leading-tight">
+              {{ selectedPerson.name }}
+            </h1>
           </div>
 
-          <div v-else-if="selectedPerson.filmography && selectedPerson.filmography.length > 0" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
-            <div 
-              v-for="item in selectedPerson.filmography" 
-              :key="item.id"
-              @click="openMediaDetail(item)"
-              class="bg-cardBg border border-white/10 rounded-xl overflow-hidden cursor-pointer group hover:-translate-y-1.5 hover:border-white/30 transition-all duration-300 shadow-xl relative flex flex-col"
+          <!-- Biography Section -->
+          <div class="space-y-3 bg-cardBg/60 p-6 rounded-2xl border border-white/10 shadow-xl">
+            <h3 class="text-sm font-heading font-bold text-gray-400 uppercase tracking-wider">Biographie</h3>
+            <p :class="['text-sm md:text-base text-gray-300 leading-relaxed font-body whitespace-pre-line', !showFullBio ? 'line-clamp-6' : '']">
+              {{ selectedPerson.biography || 'Aucune biographie disponible pour cet artiste.' }}
+            </p>
+            <button 
+              v-if="selectedPerson.biography && selectedPerson.biography.length > 300" 
+              @click="showFullBio = !showFullBio"
+              class="inline-flex items-center gap-1 text-xs font-heading font-bold text-netflixRed hover:text-netflixRedHover transition-all pt-1"
             >
-              <div class="relative aspect-[2/3] bg-gray-900 overflow-hidden">
-                <img :src="item.posterPath" :alt="item.title" @error="handleImgError($event, item.title)" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
-                <div class="absolute top-2 left-2 flex gap-1">
-                  <span class="text-[10px] font-heading font-bold px-2 py-0.5 rounded bg-black/80 text-white">
-                    {{ getCategoryBadge(item.category) }}
-                  </span>
-                  <span v-if="item.year" class="text-[10px] font-heading px-1.5 py-0.5 rounded bg-black/60 text-gray-300">{{ item.year }}</span>
+              <span>{{ showFullBio ? '▲ Réduire' : '▼ Voir plus' }}</span>
+            </button>
+          </div>
+
+          <!-- "Célèbre pour" Section (Top 8 Most Popular Works) -->
+          <div v-if="selectedPerson.filmography && selectedPerson.filmography.length > 0" class="space-y-4">
+            <h3 class="text-lg font-heading font-bold text-white flex items-center gap-2">
+              <span>🔥</span> <span>Célèbre pour</span>
+            </h3>
+            <div class="flex gap-4 overflow-x-auto pb-4 pt-1 scroll-smooth no-scrollbar">
+              <div 
+                v-for="item in selectedPerson.filmography.slice(0, 8)" 
+                :key="`famous_${item.id}`"
+                @click="openMediaDetail(item)"
+                class="flex-none w-36 group cursor-pointer space-y-2"
+              >
+                <div class="aspect-[2/3] bg-gray-900 rounded-xl overflow-hidden border border-white/10 relative group-hover:border-netflixRed group-hover:scale-105 transition-all shadow-xl">
+                  <img :src="item.posterPath" :alt="item.title" @error="handleImgError($event, item.title)" class="w-full h-full object-cover" loading="lazy" />
+                  <div class="absolute top-2 left-2">
+                    <span class="text-[10px] font-heading font-bold px-2 py-0.5 rounded bg-black/80 text-white">
+                      {{ getCategoryBadge(item.category) }}
+                    </span>
+                  </div>
                 </div>
-              </div>
-              <div class="p-3 flex flex-col flex-1">
-                <h4 class="font-heading font-bold text-sm text-white line-clamp-2 leading-snug group-hover:text-netflixRed transition-colors" :title="item.title">{{ item.title }}</h4>
-                <div class="mt-auto pt-2 flex gap-1.5">
-                  <button @click.stop="saveItem(item, 'in_progress')" class="flex-1 text-[11px] font-heading font-bold py-1 bg-netflixRed hover:bg-netflixRedHover text-white rounded-lg transition-colors">+ En cours</button>
-                  <button @click.stop="saveItem(item, 'watchlist')" class="flex-1 text-[11px] font-heading font-bold py-1 bg-traktPurple hover:opacity-90 text-white rounded-lg transition-colors">+ À voir</button>
-                </div>
+                <h4 class="font-heading font-bold text-xs text-white line-clamp-2 leading-snug group-hover:text-netflixRed transition-colors" :title="item.title">
+                  {{ item.title }}
+                </h4>
               </div>
             </div>
           </div>
-          <p v-else class="text-sm text-gray-500 italic">Aucune œuvre trouvée dans la filmographie.</p>
-        </div>
+
+          <!-- "Interprétation / Filmographie" Section (Full Grid) -->
+          <div class="space-y-4 pt-2 border-t border-white/10">
+            <h3 class="text-lg font-heading font-bold text-white flex items-center justify-between">
+              <span class="flex items-center gap-2"><span>🎬</span> <span>Interprétation / Filmographie</span></span>
+              <span class="text-xs font-normal text-gray-400 font-body">({{ selectedPerson.filmography ? selectedPerson.filmography.length : 0 }} titres)</span>
+            </h3>
+
+            <div v-if="selectedPerson.filmography && selectedPerson.filmography.length > 0" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
+              <div 
+                v-for="item in selectedPerson.filmography" 
+                :key="item.id"
+                @click="openMediaDetail(item)"
+                class="bg-cardBg border border-white/10 rounded-xl overflow-hidden cursor-pointer group hover:-translate-y-1.5 hover:border-white/30 transition-all duration-300 shadow-xl relative flex flex-col"
+              >
+                <div class="relative aspect-[2/3] bg-gray-900 overflow-hidden">
+                  <img :src="item.posterPath" :alt="item.title" @error="handleImgError($event, item.title)" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
+                  <div class="absolute top-2 left-2 flex gap-1">
+                    <span class="text-[10px] font-heading font-bold px-2 py-0.5 rounded bg-black/80 text-white">
+                      {{ getCategoryBadge(item.category) }}
+                    </span>
+                    <span v-if="item.year" class="text-[10px] font-heading px-1.5 py-0.5 rounded bg-black/60 text-gray-300">{{ item.year }}</span>
+                  </div>
+                </div>
+                <div class="p-3 flex flex-col flex-1">
+                  <h4 class="font-heading font-bold text-sm text-white line-clamp-2 leading-snug group-hover:text-netflixRed transition-colors mb-2" :title="item.title">{{ item.title }}</h4>
+                  <div class="mt-auto pt-2 flex gap-1.5">
+                    <button @click.stop="saveItem(item, 'in_progress')" class="flex-1 text-[11px] font-heading font-bold py-1 bg-netflixRed hover:bg-netflixRedHover text-white rounded-lg transition-colors">+ En cours</button>
+                    <button @click.stop="saveItem(item, 'watchlist')" class="flex-1 text-[11px] font-heading font-bold py-1 bg-traktPurple hover:opacity-90 text-white rounded-lg transition-colors">+ À voir</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <p v-else class="text-sm text-gray-500 italic">Aucune œuvre disponible dans la filmographie.</p>
+          </div>
+
+        </main>
 
       </div>
 
@@ -2399,6 +2459,12 @@
         const countCompleted = computed(() => collection.value.filter(i => i.status === 'completed').length);
         const countFavorites = computed(() => collection.value.filter(i => !!i.isFavorite).length);
 
+        const currentRoute = computed(() => {
+          if (selectedPerson.value) return 'actor';
+          if (selectedMedia.value) return 'media';
+          return 'dashboard';
+        });
+
         onMounted(() => {
           loadCollection();
           fetchRecentReleases();
@@ -2414,6 +2480,7 @@
         });
 
         return {
+          currentRoute,
           activeTab,
           activeFilter,
           activeProviderFilter,

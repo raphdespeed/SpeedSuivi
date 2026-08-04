@@ -118,6 +118,8 @@ export async function getPersonDetails(personId) {
       .sort((a, b) => (b.popularity || 0) - (a.popularity || 0))
       .map(formatMediaItem);
 
+    const genderMap = { 1: 'Femme', 2: 'Homme' };
+
     return {
       id: data.id,
       name: data.name,
@@ -125,7 +127,9 @@ export async function getPersonDetails(personId) {
       birthday: data.birthday,
       deathday: data.deathday,
       placeOfBirth: data.place_of_birth,
+      gender: genderMap[data.gender] || 'Non spécifié',
       knownForDepartment: data.known_for_department || 'Interprétation',
+      totalCredits: rawCast.length,
       profilePath: data.profile_path ? `https://image.tmdb.org/t/p/w500${data.profile_path}` : null,
       filmography: sortedFilmography
     };
