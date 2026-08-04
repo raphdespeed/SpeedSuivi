@@ -189,9 +189,9 @@
 
       </div>
 
-      <!-- Sub-Bar Filters: Category & Streaming Platforms -->
+      <!-- Sub-Bar Filters: Category, Streaming Platforms, Genre & Year -->
       <div class="max-w-7xl mx-auto mt-3 space-y-2">
-        <div class="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+        <div class="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar flex-wrap">
           <!-- Category Pills -->
           <span class="text-[11px] font-heading font-bold text-gray-400 uppercase tracking-wider hidden sm:inline">Type :</span>
           <button 
@@ -215,6 +215,44 @@
           >
             <span>{{ provider.icon }}</span>
             <span>{{ provider.label }}</span>
+          </button>
+        </div>
+
+        <!-- Row 2: Genre & Year Filters -->
+        <div class="flex items-center gap-3 overflow-x-auto pb-1 no-scrollbar pt-1 border-t border-white/5">
+          <!-- Genre Dropdown -->
+          <div class="flex items-center gap-1.5">
+            <span class="text-[11px] font-heading font-bold text-gray-400 uppercase tracking-wider">🎭 Genre :</span>
+            <select 
+              v-model="activeGenreFilter" 
+              @change="onFilterChange"
+              class="bg-surfaceBg border border-white/15 rounded-xl px-2.5 py-1 text-xs font-heading font-semibold text-white focus:outline-none focus:border-netflixRed cursor-pointer"
+            >
+              <option v-for="g in genreOptions" :key="g.id" :value="g.id">{{ g.label }}</option>
+            </select>
+          </div>
+
+          <!-- Year Dropdown -->
+          <div class="flex items-center gap-1.5">
+            <span class="text-[11px] font-heading font-bold text-gray-400 uppercase tracking-wider">📅 Année :</span>
+            <select 
+              v-model="activeYearFilter" 
+              @change="onFilterChange"
+              class="bg-surfaceBg border border-white/15 rounded-xl px-2.5 py-1 text-xs font-heading font-semibold text-white focus:outline-none focus:border-netflixRed cursor-pointer"
+            >
+              <option value="all">Toutes les années</option>
+              <option v-for="y in yearOptions" :key="y" :value="y">{{ y }}</option>
+            </select>
+          </div>
+
+          <!-- Reset Filters Button -->
+          <button 
+            v-if="hasActiveFilters" 
+            @click="resetAllFilters"
+            class="text-[11px] font-heading font-bold text-netflixRed hover:text-white bg-netflixRed/10 hover:bg-netflixRed border border-netflixRed/30 px-2.5 py-1 rounded-xl transition-all ml-auto flex items-center gap-1"
+            title="Réinitialiser tous les filtres"
+          >
+            <span>🔄</span> Réinitialiser
           </button>
         </div>
       </div>
@@ -940,6 +978,8 @@
         const activeTab = ref('in_progress');
         const activeFilter = ref('all');
         const activeProviderFilter = ref('all');
+        const activeGenreFilter = ref('all');
+        const activeYearFilter = ref('all');
 
         const searchQuery = ref('');
         const searchResults = ref([]);
@@ -983,6 +1023,37 @@
           { id: 'crunchyroll', providerId: 283, label: 'Crunchyroll', icon: '🟠' },
           { id: 'paramount', providerId: 531, label: 'Paramount+', icon: '🔷' }
         ];
+
+        // Main TMDB Genres List
+        const genreOptions = [
+          { id: 'all', label: 'Tous les genres' },
+          { id: 28, label: '💥 Action' },
+          { id: 12, label: '🧭 Aventure' },
+          { id: 16, label: '🎨 Animation' },
+          { id: 35, label: '😂 Comédie' },
+          { id: 80, label: '🕵️ Crime' },
+          { id: 99, label: '📹 Documentaire' },
+          { id: 18, label: '🎭 Drame' },
+          { id: 10751, label: '👨‍👩‍👧 Familial' },
+          { id: 14, label: '🔮 Fantastique' },
+          { id: 36, label: '📜 Histoire' },
+          { id: 27, label: '😱 Horreur' },
+          { id: 9648, label: '🔍 Mystère' },
+          { id: 10749, label: '❤️ Romance' },
+          { id: 878, label: '🚀 Sci-Fi' },
+          { id: 53, label: '⚡ Thriller' },
+          { id: 10752, label: '⚔️ Guerre' }
+        ];
+
+        // Release Years List (2026 down to 1980)
+        const yearOptions = computed(() => {
+          const currentYear = new Date().getFullYear();
+          const list = [];
+          for (let y = currentYear; y >= 1980; y--) {
+            list.push(String(y));
+          }
+          return list;
+        });
 
         // Load collection from localStorage
         const loadCollection = () => {
@@ -1035,6 +1106,7 @@
           const title = raw.title || raw.name || 'Titre inconnu';
 
           const posterUrl = raw.poster_path ? `${POSTER_BASE}${raw.poster_path}` : createSvgPlaceholder(title);
+          const rawGenreIds = raw.genre_ids || (raw.genres ? raw.genres.map(g => g.id) : []);
 
           return {
             id: `${isMovie ? 'movie' : 'tv'}_${raw.id}`,
@@ -1049,6 +1121,7 @@
             releaseDate: releaseDate,
             year: releaseDate ? releaseDate.substring(0, 4) : '',
             voteAverage: raw.vote_average ? Math.round(raw.vote_average * 10) / 10 : null,
+            genreIds: rawGenreIds,
             totalSeasons: raw.number_of_seasons || 1,
             totalEpisodes: raw.number_of_episodes || (isMovie ? 1 : 12),
             isFavorite: raw.isFavorite || false,
@@ -1207,24 +1280,32 @@
           }
         };
 
-        // Unified Discovery Engine (K-Drama / Provider / Trending via Nginx Proxy)
+        // Unified Discovery Engine (K-Drama / Provider / Genre / Year / Trending via Nginx Proxy)
         const fetchDiscoveryContent = async (page = 1, append = false) => {
           if (!append) isSearching.value = true;
           try {
             let movieUrl = '';
             let tvUrl = '';
 
+            const genreParam = activeGenreFilter.value !== 'all' ? `&with_genres=${activeGenreFilter.value}` : '';
+            const movieYearParam = activeYearFilter.value !== 'all' ? `&primary_release_year=${activeYearFilter.value}` : '';
+            const tvYearParam = activeYearFilter.value !== 'all' ? `&first_air_date_year=${activeYearFilter.value}` : '';
+
             if (activeFilter.value === 'kdrama') {
-              tvUrl = `${BASE_URL}/discover/tv?with_origin_country=KR&with_original_language=ko&language=fr-FR&sort_by=popularity.desc&page=${page}`;
+              tvUrl = `${BASE_URL}/discover/tv?with_origin_country=KR&with_original_language=ko&language=fr-FR&sort_by=popularity.desc&page=${page}${genreParam}${tvYearParam}`;
             } 
             else if (activeProviderFilter.value !== 'all') {
               const selected = providerFilters.find(p => p.id === activeProviderFilter.value);
               const provId = selected?.providerId;
               if (provId) {
-                movieUrl = `${BASE_URL}/discover/movie?with_watch_providers=${provId}&watch_region=FR&language=fr-FR&sort_by=popularity.desc&page=${page}`;
-                tvUrl = `${BASE_URL}/discover/tv?with_watch_providers=${provId}&watch_region=FR&language=fr-FR&sort_by=popularity.desc&page=${page}`;
+                movieUrl = `${BASE_URL}/discover/movie?with_watch_providers=${provId}&watch_region=FR&language=fr-FR&sort_by=popularity.desc&page=${page}${genreParam}${movieYearParam}`;
+                tvUrl = `${BASE_URL}/discover/tv?with_watch_providers=${provId}&watch_region=FR&language=fr-FR&sort_by=popularity.desc&page=${page}${genreParam}${tvYearParam}`;
               }
             } 
+            else if (activeGenreFilter.value !== 'all' || activeYearFilter.value !== 'all') {
+              movieUrl = `${BASE_URL}/discover/movie?language=fr-FR&sort_by=popularity.desc&page=${page}${genreParam}${movieYearParam}`;
+              tvUrl = `${BASE_URL}/discover/tv?language=fr-FR&sort_by=popularity.desc&page=${page}${genreParam}${tvYearParam}`;
+            }
             else {
               const url = `${BASE_URL}/trending/all/week?language=fr-FR&page=${page}`;
               const res = await fetch(url);
@@ -1305,6 +1386,28 @@
           }
         };
 
+        const onFilterChange = () => {
+          trendingPage.value = 1;
+          if (!searchQuery.value.trim()) {
+            fetchDiscoveryContent(1);
+          }
+        };
+
+        const hasActiveFilters = computed(() => {
+          return activeFilter.value !== 'all' || activeProviderFilter.value !== 'all' || activeGenreFilter.value !== 'all' || activeYearFilter.value !== 'all';
+        });
+
+        const resetAllFilters = () => {
+          activeFilter.value = 'all';
+          activeProviderFilter.value = 'all';
+          activeGenreFilter.value = 'all';
+          activeYearFilter.value = 'all';
+          trendingPage.value = 1;
+          if (!searchQuery.value.trim()) {
+            fetchDiscoveryContent(1);
+          }
+        };
+
         const handleImgError = (event, title) => {
           event.target.src = createSvgPlaceholder(title);
         };
@@ -1345,53 +1448,55 @@
 
         // Quick Episode +/- Controls
         const changeEpisode = (itemId, delta) => {
-          const item = collection.value.find(i => i.id === itemId);
-          if (!item) return;
+          const existingIndex = collection.value.findIndex(i => i.id === itemId);
+          if (existingIndex >= 0) {
+            const item = collection.value[existingIndex];
+            const isMovie = item.mediaType === 'movie';
+            const total = item.totalEpisodes || (isMovie ? 1 : 12);
+            let nextEp = (item.currentEpisode || 0) + delta;
+            nextEp = Math.max(0, Math.min(total, nextEp));
 
-          const maxEp = item.totalEpisodes || 999;
-          let nextEp = (item.currentEpisode || 0) + delta;
-          nextEp = Math.max(0, Math.min(maxEp, nextEp));
+            let nextStatus = item.status;
+            if (nextEp >= total && total > 0) {
+              nextStatus = 'completed';
+            } else if (nextEp > 0 && nextStatus === 'watchlist') {
+              nextStatus = 'in_progress';
+            }
 
-          item.currentEpisode = nextEp;
-
-          if (nextEp >= maxEp && item.status === 'in_progress') {
-            item.status = 'completed';
-            showToast(`"${item.title}" marqué comme Terminé ! 🎉`, 'success');
-          } else {
-            showToast(`"${item.title}" : Épisode ${nextEp} / ${maxEp}`, 'info');
+            collection.value[existingIndex] = {
+              ...item,
+              currentEpisode: nextEp,
+              status: nextStatus,
+              updatedAt: new Date().toISOString()
+            };
+            saveCollection();
           }
-
-          saveCollection();
         };
 
         // Change Media Status
         const changeStatus = (itemId, newStatus) => {
-          const item = collection.value.find(i => i.id === itemId);
-          if (!item) return;
-
-          item.status = newStatus;
-          if (newStatus === 'completed') {
-            item.currentEpisode = item.totalEpisodes || 1;
-          } else if (newStatus === 'in_progress' && item.currentEpisode === 0) {
-            item.currentEpisode = 1;
+          const existingIndex = collection.value.findIndex(i => i.id === itemId);
+          if (existingIndex >= 0) {
+            const item = collection.value[existingIndex];
+            saveItem(item, newStatus, {
+              currentSeason: item.currentSeason,
+              currentEpisode: item.currentEpisode
+            });
           }
-
-          saveCollection();
-          showToast(`"${item.title}" passé en ${newStatus === 'in_progress' ? 'En cours' : newStatus === 'completed' ? 'Terminé' : 'À voir'}`, 'success');
         };
 
         const removeFromLibrary = (itemId) => {
-          collection.value = collection.value.filter(i => i.id !== itemId);
-          saveCollection();
-          selectedMedia.value = null;
-          showToast('Média retiré de votre liste.', 'info');
+          const existingIndex = collection.value.findIndex(i => i.id === itemId);
+          if (existingIndex >= 0) {
+            const title = collection.value[existingIndex].title;
+            collection.value.splice(existingIndex, 1);
+            saveCollection();
+            showToast(`"${title}" retiré de la bibliothèque`, 'info');
+          }
         };
 
         // Open Modal & Fetch Recommendations / Similar Titles via Nginx Proxy
-        const openModal = async (item) => {
-          const existing = collection.value.find(i => i.id === item.id);
-          const activeItem = existing ? { ...item, ...existing } : item;
-
+        const openModal = async (activeItem) => {
           selectedMedia.value = activeItem;
           modalStatus.value = activeItem.status || 'in_progress';
           modalSeason.value = activeItem.currentSeason || 1;
@@ -1529,23 +1634,32 @@
           }, 3000);
         };
 
-        // Filtered Search Results
-        const filteredSearchResults = computed(() => {
-          let list = searchResults.value;
+        // Helper for applying Category, Genre & Year filters
+        const applyFilters = (list) => {
+          let result = list;
+          
           if (activeFilter.value !== 'all') {
-            list = list.filter(i => i.category === activeFilter.value);
+            result = result.filter(i => i.category === activeFilter.value);
           }
-          return list;
-        });
+
+          if (activeGenreFilter.value !== 'all') {
+            const targetGenreId = Number(activeGenreFilter.value);
+            result = result.filter(i => i.genreIds && i.genreIds.includes(targetGenreId));
+          }
+
+          if (activeYearFilter.value !== 'all') {
+            const targetYear = String(activeYearFilter.value);
+            result = result.filter(i => i.year === targetYear);
+          }
+
+          return result;
+        };
+
+        // Filtered Search Results
+        const filteredSearchResults = computed(() => applyFilters(searchResults.value));
 
         // Filtered Trending / Discover Results
-        const filteredTrendingResults = computed(() => {
-          let list = trendingResults.value;
-          if (activeFilter.value !== 'all') {
-            list = list.filter(i => i.category === activeFilter.value);
-          }
-          return list;
-        });
+        const filteredTrendingResults = computed(() => applyFilters(trendingResults.value));
 
         // Filtered Library Items (Support for 'favorites' / 'À revoir' tab as well!)
         const currentLibraryItems = computed(() => {
@@ -1556,9 +1670,8 @@
             list = collection.value.filter(i => i.status === activeTab.value);
           }
 
-          if (activeFilter.value !== 'all') {
-            list = list.filter(i => i.category === activeFilter.value);
-          }
+          list = applyFilters(list);
+
           if (activeProviderFilter.value !== 'all') {
             const provQuery = activeProviderFilter.value;
             list = list.filter(i => {
@@ -1596,8 +1709,12 @@
           activeTab,
           activeFilter,
           activeProviderFilter,
+          activeGenreFilter,
+          activeYearFilter,
           filterOptions,
           providerFilters,
+          genreOptions,
+          yearOptions,
           searchQuery,
           searchResults,
           searchPage,
@@ -1630,6 +1747,9 @@
           loadNextPage,
           onSelectCategoryFilter,
           onSelectProviderFilter,
+          onFilterChange,
+          hasActiveFilters,
+          resetAllFilters,
           handleImgError,
           toggleFavorite,
           isFavoriteItem,
