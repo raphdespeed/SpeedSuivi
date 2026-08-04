@@ -45,7 +45,7 @@ function saveTokenInfo(token, expiresInSeconds) {
 
 /**
  * Proactively check if token is valid or expiring within 5 minutes.
- * If less than 5 mins remain (or expired), attempt silent refresh.
+ * Performs silent refresh ONLY when an active user session token exists.
  */
 async function ensureValidToken() {
   if (!accessToken) return false;
@@ -58,7 +58,7 @@ async function ensureValidToken() {
     return true;
   }
 
-  // Token expiring soon or expired -> Attempt silent refresh in background
+  // Token expiring soon -> Attempt silent refresh during active API calls
   if (tokenClient) {
     return new Promise((resolve) => {
       try {
@@ -155,118 +155,131 @@ async function fetchWithDriveAuth(url, options = {}) {
 
 /**
  * Initialize Google Token Client via Google Identity Services (GIS)
+ * Secure silent restoration & mobile-friendly user-triggered login flow.
  */
 export function initDriveSync(onStatusChange, onDataReceived) {
   if (onStatusChange) statusChangeCallback = onStatusChange;
 
-  // 1. Restore cached user and token info from localStorage
-  const cachedUser = localStorage.getItem(USER_KEY);
-  if (cachedUser) {
-    try {
-      driveState.user = JSON.parse(cachedUser);
-    } catch (e) {}
-  }
-
-  const cachedTokenInfoStr = localStorage.getItem(TOKEN_INFO_KEY);
-  let isCachedTokenValid = false;
-
-  if (cachedTokenInfoStr) {
-    try {
-      const tokenInfo = JSON.parse(cachedTokenInfoStr);
-      const token = tokenInfo.accessToken || tokenInfo.token;
-      const expiresAt = parseInt(tokenInfo.expiresAt || tokenInfo.expiry, 10) || 0;
-
-      if (token && expiresAt) {
-        accessToken = token;
-        tokenExpiryTime = expiresAt;
-
-        // Check if token has more than 5 minutes left
-        if (Date.now() < tokenExpiryTime) {
-          isCachedTokenValid = true;
-          driveState.isConnected = true;
-          if (onStatusChange) onStatusChange(driveState);
-
-          // Trigger initial sync with cached token
-          syncWithDrive(onDataReceived, onStatusChange);
-        }
-      }
-    } catch (e) {
-      console.error('Error parsing gdrive_token_info:', e);
+  try {
+    // 1. Restore cached user profile from localStorage
+    const cachedUser = localStorage.getItem(USER_KEY);
+    if (cachedUser) {
+      try {
+        driveState.user = JSON.parse(cachedUser);
+      } catch (e) {}
     }
-  }
 
-  // 2. Initialize GIS Token Client
-  const checkGISLoaded = () => {
-    if (window.google && window.google.accounts && window.google.accounts.oauth2) {
-      tokenClient = window.google.accounts.oauth2.initTokenClient({
-        client_id: CLIENT_ID,
-        scope: SCOPE,
-        callback: async (response) => {
-          if (response.error) {
-            console.warn('OAuth GIS Response error:', response.error);
-            driveState.error = response.error;
-            driveState.isSyncing = false;
-            driveState.isConnected = false;
-            localStorage.removeItem(TOKEN_INFO_KEY);
-            if (onStatusChange) onStatusChange(driveState);
-            return;
-          }
+    // 2. Restore cached token if STILL VALID (expiresAt > Date.now())
+    const cachedTokenInfoStr = localStorage.getItem(TOKEN_INFO_KEY);
 
-          // Save fresh token to localStorage ({ accessToken, expiresAt })
-          saveTokenInfo(response.access_token, response.expires_in);
+    if (cachedTokenInfoStr) {
+      try {
+        const tokenInfo = JSON.parse(cachedTokenInfoStr);
+        const token = tokenInfo.accessToken || tokenInfo.token;
+        const expiresAt = parseInt(tokenInfo.expiresAt || tokenInfo.expiry, 10) || 0;
 
+        if (token && expiresAt && expiresAt > Date.now()) {
+          accessToken = token;
+          tokenExpiryTime = expiresAt;
           driveState.isConnected = true;
-          driveState.error = null;
-
-          // Fetch user profile using Google userInfo API
-          try {
-            const userRes = await fetchWithDriveAuth('https://www.googleapis.com/oauth2/v3/userinfo');
-            if (userRes && userRes.ok) {
-              const uData = await userRes.json();
-              driveState.user = {
-                email: uData.email,
-                name: uData.name || uData.email,
-                picture: uData.picture || null
-              };
-              localStorage.setItem(USER_KEY, JSON.stringify(driveState.user));
-            }
-          } catch (ue) {
-            console.warn('UserInfo fetch warning:', ue);
-          }
-
           if (onStatusChange) onStatusChange(driveState);
 
-          // Perform sync with Google Drive appDataFolder
-          if (onDataReceived) {
-            await syncWithDrive(onDataReceived, onStatusChange);
-          }
+          // Perform initial sync using valid cached token without auto-prompting
+          syncWithDrive(onDataReceived, onStatusChange);
+        } else {
+          // Token expired -> Reset to disconnected state, DO NOT auto-trigger requestAccessToken() on load
+          localStorage.removeItem(TOKEN_INFO_KEY);
+          driveState.isConnected = false;
+          if (onStatusChange) onStatusChange(driveState);
         }
-      });
-
-      // 3. Silent re-auth if token was missing or expired
-      if (!isCachedTokenValid && (cachedTokenInfoStr || cachedUser)) {
-        try {
-          tokenClient.requestAccessToken({ prompt: '' });
-        } catch (se) {
-          console.warn('Silent re-auth failed on init:', se);
-        }
+      } catch (e) {
+        console.error('Error parsing gdrive_token_info:', e);
+        localStorage.removeItem(TOKEN_INFO_KEY);
+        driveState.isConnected = false;
+        if (onStatusChange) onStatusChange(driveState);
       }
     } else {
-      setTimeout(checkGISLoaded, 300);
+      driveState.isConnected = false;
+      if (onStatusChange) onStatusChange(driveState);
     }
-  };
 
-  checkGISLoaded();
+    // 3. Initialize GIS Token Client in background (ready for user explicit click)
+    const checkGISLoaded = () => {
+      try {
+        if (window.google && window.google.accounts && window.google.accounts.oauth2) {
+          tokenClient = window.google.accounts.oauth2.initTokenClient({
+            client_id: CLIENT_ID,
+            scope: SCOPE,
+            callback: async (response) => {
+              if (response.error) {
+                console.warn('OAuth GIS Response error:', response.error);
+                driveState.error = response.error;
+                driveState.isSyncing = false;
+                driveState.isConnected = false;
+                localStorage.removeItem(TOKEN_INFO_KEY);
+                if (onStatusChange) onStatusChange(driveState);
+                return;
+              }
+
+              // Save fresh token to localStorage ({ accessToken, expiresAt })
+              saveTokenInfo(response.access_token, response.expires_in);
+
+              driveState.isConnected = true;
+              driveState.error = null;
+
+              // Fetch user profile using Google userInfo API
+              try {
+                const userRes = await fetchWithDriveAuth('https://www.googleapis.com/oauth2/v3/userinfo');
+                if (userRes && userRes.ok) {
+                  const uData = await userRes.json();
+                  driveState.user = {
+                    email: uData.email,
+                    name: uData.name || uData.email,
+                    picture: uData.picture || null
+                  };
+                  localStorage.setItem(USER_KEY, JSON.stringify(driveState.user));
+                }
+              } catch (ue) {
+                console.warn('UserInfo fetch warning:', ue);
+              }
+
+              if (onStatusChange) onStatusChange(driveState);
+
+              // Perform sync with Google Drive appDataFolder
+              if (onDataReceived) {
+                await syncWithDrive(onDataReceived, onStatusChange);
+              }
+            }
+          });
+        } else {
+          setTimeout(checkGISLoaded, 300);
+        }
+      } catch (gisError) {
+        console.warn('Google Identity Services initialization warning:', gisError);
+      }
+    };
+
+    checkGISLoaded();
+  } catch (initErr) {
+    console.error('initDriveSync top-level error caught gracefully:', initErr);
+    driveState.isConnected = false;
+    if (onStatusChange) onStatusChange(driveState);
+  }
 }
 
 /**
- * Trigger explicit OAuth login flow with user consent
+ * Trigger explicit OAuth login flow with user consent upon explicit click
  */
 export function loginGoogleDrive() {
-  if (tokenClient) {
-    tokenClient.requestAccessToken({ prompt: 'consent' });
-  } else {
-    alert("Le service Google Identity n'est pas encore prêt. Veuillez réessayer dans un instant.");
+  try {
+    if (tokenClient) {
+      tokenClient.requestAccessToken({ prompt: 'consent' });
+    } else {
+      alert("Le service Google Identity n'est pas encore prêt. Veuillez réessayer dans un instant.");
+    }
+  } catch (e) {
+    console.error('Error triggering Google Drive login:', e);
+    alert("Impossible d'ouvrir la fenêtre de connexion Google. Veuillez vérifier votre bloqueur de pop-ups.");
   }
 }
 
@@ -274,11 +287,11 @@ export function loginGoogleDrive() {
  * Logout from Google Drive sync and clean localStorage
  */
 export function logoutGoogleDrive(onStatusChange) {
-  if (accessToken && window.google?.accounts?.oauth2) {
-    try {
+  try {
+    if (accessToken && window.google?.accounts?.oauth2) {
       window.google.accounts.oauth2.revoke(accessToken, () => {});
-    } catch (e) {}
-  }
+    }
+  } catch (e) {}
 
   accessToken = null;
   driveFileId = null;
