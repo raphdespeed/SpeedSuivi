@@ -103,6 +103,39 @@ export async function getMediaDetails(id, mediaType) {
 }
 
 /**
+ * Fetch detailed info for a person / actor (via Nginx Proxy)
+ */
+export async function getPersonDetails(personId) {
+  try {
+    const url = `${BASE_URL}/person/${personId}?language=fr-FR&append_to_response=combined_credits,external_ids`;
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    const data = await response.json();
+
+    const rawCast = data.combined_credits?.cast || [];
+    const sortedFilmography = rawCast
+      .filter(item => item.poster_path)
+      .sort((a, b) => (b.popularity || 0) - (a.popularity || 0))
+      .map(formatMediaItem);
+
+    return {
+      id: data.id,
+      name: data.name,
+      biography: data.biography || 'Aucune biographie disponible.',
+      birthday: data.birthday,
+      deathday: data.deathday,
+      placeOfBirth: data.place_of_birth,
+      knownForDepartment: data.known_for_department || 'Interprétation',
+      profilePath: data.profile_path ? `https://image.tmdb.org/t/p/w500${data.profile_path}` : null,
+      filmography: sortedFilmography
+    };
+  } catch (error) {
+    console.error('TMDB Person Details Error:', error);
+    return null;
+  }
+}
+
+/**
  * Fetch specific TV season details to get episode list & count (via Nginx Proxy)
  */
 export async function getSeasonDetails(tvId, seasonNumber) {

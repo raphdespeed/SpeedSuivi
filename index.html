@@ -1131,7 +1131,8 @@
             <div 
               v-for="actor in selectedMedia.cast" 
               :key="actor.id" 
-              class="flex-none w-28 text-center space-y-2 group"
+              @click="openPersonDetail(actor.id)"
+              class="flex-none w-28 text-center space-y-2 group cursor-pointer"
             >
               <div class="w-24 h-24 mx-auto rounded-full overflow-hidden border-2 border-white/10 group-hover:border-netflixRed transition-all shadow-lg bg-surfaceBg relative">
                 <img 
@@ -1209,6 +1210,121 @@
             </div>
           </div>
           <p v-else class="text-xs text-gray-500 italic">Aucune recommandation similaire trouvée.</p>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- ================= FULL PAGE PERSON / ACTOR VIEW ================= -->
+    <div v-if="selectedPerson && !selectedMedia" class="min-h-screen bg-darkBg text-white flex flex-col flex-1 pb-24 animate-fadeIn relative z-40">
+      
+      <!-- Sticky Top Back Bar -->
+      <div class="sticky top-4 left-4 md:top-6 md:left-8 z-50 px-4 md:px-8">
+        <button 
+          @click="closePersonView"
+          class="inline-flex items-center gap-2 bg-black/80 hover:bg-netflixRed text-white text-xs md:text-sm font-heading font-bold px-4 py-2.5 rounded-full border border-white/20 shadow-2xl backdrop-blur-md transition-all active:scale-95 group"
+        >
+          <span class="transform group-hover:-translate-x-1 transition-transform">←</span>
+          <span>Retour</span>
+        </button>
+      </div>
+
+      <div class="max-w-6xl mx-auto w-full px-4 md:px-8 pt-8 space-y-8 flex-1">
+        
+        <!-- Header Info Card -->
+        <div class="bg-cardBg/80 border border-white/10 rounded-2xl p-6 md:p-8 backdrop-blur-md shadow-2xl flex flex-col md:flex-row gap-6 md:gap-8 items-center md:items-start">
+          <img 
+            v-if="selectedPerson.profilePath" 
+            :src="selectedPerson.profilePath" 
+            :alt="selectedPerson.name" 
+            class="w-40 md:w-56 aspect-[2/3] object-cover rounded-2xl border-4 border-white/20 shadow-2xl shrink-0" 
+          />
+          <div v-else class="w-40 md:w-56 aspect-[2/3] bg-gray-800 rounded-2xl border-4 border-white/20 shadow-2xl shrink-0 flex items-center justify-center text-5xl">
+            👤
+          </div>
+
+          <div class="space-y-4 flex-1 text-center md:text-left">
+            <div>
+              <span class="bg-netflixRed text-white text-xs font-heading font-bold px-3 py-1 rounded-full uppercase tracking-wider">
+                {{ selectedPerson.knownForDepartment || 'Acteur / Actrice' }}
+              </span>
+              <h1 class="font-heading font-extrabold text-3xl md:text-4xl text-white mt-2 leading-tight">
+                {{ selectedPerson.name }}
+              </h1>
+            </div>
+
+            <!-- Meta details (Birth, Death, Place) -->
+            <div class="flex flex-wrap justify-center md:justify-start gap-4 text-xs md:text-sm text-gray-300 font-heading">
+              <div v-if="selectedPerson.birthday" class="flex items-center gap-1.5 bg-surfaceBg px-3 py-1.5 rounded-xl border border-white/10">
+                <span>🎂</span>
+                <span>Né(e) le : {{ formatDate(selectedPerson.birthday) }}</span>
+                <span v-if="getAge(selectedPerson.birthday, selectedPerson.deathday)" class="text-gray-400">({{ getAge(selectedPerson.birthday, selectedPerson.deathday) }} ans)</span>
+              </div>
+              <div v-if="selectedPerson.deathday" class="flex items-center gap-1.5 bg-surfaceBg px-3 py-1.5 rounded-xl border border-white/10 text-red-400">
+                <span>🕊️</span>
+                <span>Décédé(e) le : {{ formatDate(selectedPerson.deathday) }}</span>
+              </div>
+              <div v-if="selectedPerson.placeOfBirth" class="flex items-center gap-1.5 bg-surfaceBg px-3 py-1.5 rounded-xl border border-white/10">
+                <span>📍</span>
+                <span>{{ selectedPerson.placeOfBirth }}</span>
+              </div>
+            </div>
+
+            <!-- Biography Block -->
+            <div class="space-y-2 pt-2 border-t border-white/10">
+              <h4 class="text-xs font-heading font-bold text-gray-400 uppercase tracking-wider">Biographie</h4>
+              <p :class="['text-sm text-gray-300 leading-relaxed font-body whitespace-pre-line', !showFullBio ? 'line-clamp-4' : '']">
+                {{ selectedPerson.biography || 'Aucune biographie disponible en français.' }}
+              </p>
+              <button 
+                v-if="selectedPerson.biography && selectedPerson.biography.length > 280" 
+                @click="showFullBio = !showFullBio"
+                class="text-xs font-heading font-bold text-netflixRed hover:underline transition-all"
+              >
+                {{ showFullBio ? 'Réduire' : 'Lire la suite...' }}
+              </button>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Filmography Section -->
+        <div class="space-y-4">
+          <h3 class="text-lg font-heading font-bold text-white flex items-center gap-2">
+            <span>🎬</span> <span>Filmographie ({{ selectedPerson.filmography ? selectedPerson.filmography.length : 0 }} œuvres)</span>
+          </h3>
+
+          <div v-if="isLoadingPerson" class="flex justify-center py-12">
+            <div class="w-10 h-10 border-4 border-white/10 border-t-netflixRed rounded-full animate-spin"></div>
+          </div>
+
+          <div v-else-if="selectedPerson.filmography && selectedPerson.filmography.length > 0" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
+            <div 
+              v-for="item in selectedPerson.filmography" 
+              :key="item.id"
+              @click="openMediaDetail(item)"
+              class="bg-cardBg border border-white/10 rounded-xl overflow-hidden cursor-pointer group hover:-translate-y-1.5 hover:border-white/30 transition-all duration-300 shadow-xl relative flex flex-col"
+            >
+              <div class="relative aspect-[2/3] bg-gray-900 overflow-hidden">
+                <img :src="item.posterPath" :alt="item.title" @error="handleImgError($event, item.title)" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
+                <div class="absolute top-2 left-2 flex gap-1">
+                  <span class="text-[10px] font-heading font-bold px-2 py-0.5 rounded bg-black/80 text-white">
+                    {{ getCategoryBadge(item.category) }}
+                  </span>
+                  <span v-if="item.year" class="text-[10px] font-heading px-1.5 py-0.5 rounded bg-black/60 text-gray-300">{{ item.year }}</span>
+                </div>
+              </div>
+              <div class="p-3 flex flex-col flex-1">
+                <h4 class="font-heading font-bold text-sm text-white line-clamp-2 leading-snug group-hover:text-netflixRed transition-colors" :title="item.title">{{ item.title }}</h4>
+                <div class="mt-auto pt-2 flex gap-1.5">
+                  <button @click.stop="saveItem(item, 'in_progress')" class="flex-1 text-[11px] font-heading font-bold py-1 bg-netflixRed hover:bg-netflixRedHover text-white rounded-lg transition-colors">+ En cours</button>
+                  <button @click.stop="saveItem(item, 'watchlist')" class="flex-1 text-[11px] font-heading font-bold py-1 bg-traktPurple hover:opacity-90 text-white rounded-lg transition-colors">+ À voir</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <p v-else class="text-sm text-gray-500 italic">Aucune œuvre trouvée dans la filmographie.</p>
         </div>
 
       </div>
@@ -1310,6 +1426,10 @@
 
         const collection = ref([]);
         const selectedMedia = ref(null);
+        const selectedPerson = ref(null);
+        const isLoadingPerson = ref(false);
+        const showFullBio = ref(false);
+
         const modalStatus = ref('in_progress');
         const modalSeason = ref(1);
         const modalEpisode = ref(0);
@@ -1318,6 +1438,25 @@
 
         const toasts = ref([]);
         let debounceTimer = null;
+
+        const formatDate = (dateStr) => {
+          if (!dateStr) return '';
+          const [year, month, day] = dateStr.split('-');
+          if (!day) return dateStr;
+          return `${day}/${month}/${year}`;
+        };
+
+        const getAge = (birthStr, deathStr) => {
+          if (!birthStr) return null;
+          const birth = new Date(birthStr);
+          const endDate = deathStr ? new Date(deathStr) : new Date();
+          let age = endDate.getFullYear() - birth.getFullYear();
+          const m = endDate.getMonth() - birth.getMonth();
+          if (m < 0 || (m === 0 && endDate.getDate() < birth.getDate())) {
+            age--;
+          }
+          return age;
+        };
 
         const filterOptions = [
           { id: 'all', label: 'Tous les types' },
@@ -1475,6 +1614,7 @@
         // Navigation & Hash Router
         const navigateTo = (tabName) => {
           selectedMedia.value = null;
+          selectedPerson.value = null;
           activeTab.value = tabName;
           window.location.hash = `#${tabName}`;
           window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1483,6 +1623,7 @@
         const updateRouteFromHash = () => {
           const hash = window.location.hash || '#home';
           if (hash.startsWith('#media/')) {
+            selectedPerson.value = null;
             const mediaId = hash.replace('#media/', '');
             const foundInCol = collection.value.find(i => i.id === mediaId);
             if (foundInCol) {
@@ -1490,8 +1631,15 @@
             } else if (!selectedMedia.value || selectedMedia.value.id !== mediaId) {
               fetchMediaByIdAndOpen(mediaId);
             }
+          } else if (hash.startsWith('#actor/')) {
+            selectedMedia.value = null;
+            const personId = hash.replace('#actor/', '');
+            if (!selectedPerson.value || String(selectedPerson.value.id) !== personId) {
+              openPersonDetail(personId, false);
+            }
           } else {
             selectedMedia.value = null;
+            selectedPerson.value = null;
             const tabName = hash.replace('#', '') || 'home';
             if (['home', 'in_progress', 'watchlist', 'completed', 'favorites', 'search'].includes(tabName)) {
               activeTab.value = tabName;
@@ -1503,6 +1651,7 @@
 
         const openMediaDetail = async (item, updateHash = true) => {
           selectedMedia.value = item;
+          selectedPerson.value = null;
           modalStatus.value = item.status || 'in_progress';
           modalSeason.value = item.currentSeason || 1;
           modalEpisode.value = item.currentEpisode || 0;
@@ -1516,6 +1665,64 @@
           enrichWatchProviders(item);
           fetchRecommendationsForMedia(item);
           fetchExtendedMediaDetails(item);
+        };
+
+        const openPersonDetail = async (personId, updateHash = true) => {
+          selectedMedia.value = null;
+          isLoadingPerson.value = true;
+          showFullBio.value = false;
+
+          if (updateHash) {
+            window.location.hash = `#actor/${personId}`;
+          }
+
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+
+          try {
+            const url = `${BASE_URL}/person/${personId}?language=fr-FR&append_to_response=combined_credits,external_ids`;
+            const res = await fetch(url);
+            const data = await res.json();
+
+            let bio = data.biography;
+            if (!bio || bio.trim() === '') {
+              try {
+                const enRes = await fetch(`${BASE_URL}/person/${personId}?language=en-US`);
+                const enData = await enRes.json();
+                bio = enData.biography || 'Aucune biographie disponible.';
+              } catch (e) {
+                bio = 'Aucune biographie disponible.';
+              }
+            }
+
+            const rawCast = data.combined_credits?.cast || [];
+            const sortedFilmography = rawCast
+              .filter(item => item.poster_path)
+              .sort((a, b) => (b.popularity || 0) - (a.popularity || 0))
+              .map(formatItem);
+
+            selectedPerson.value = {
+              id: data.id,
+              name: data.name,
+              biography: bio,
+              birthday: data.birthday,
+              deathday: data.deathday,
+              placeOfBirth: data.place_of_birth,
+              knownForDepartment: data.known_for_department || 'Interprétation',
+              profilePath: data.profile_path ? `https://image.tmdb.org/t/p/w500${data.profile_path}` : null,
+              filmography: sortedFilmography
+            };
+          } catch (e) {
+            console.error('Error fetching person details:', e);
+          } finally {
+            isLoadingPerson.value = false;
+          }
+        };
+
+        const closePersonView = () => {
+          selectedPerson.value = null;
+          if (window.location.hash.startsWith('#actor/')) {
+            window.history.back();
+          }
         };
 
         const fetchExtendedMediaDetails = async (item) => {
@@ -2220,6 +2427,9 @@
           showBackToTop,
           collection,
           selectedMedia,
+          selectedPerson,
+          isLoadingPerson,
+          showFullBio,
           activeLightboxImage,
           modalStatus,
           modalSeason,
@@ -2240,6 +2450,10 @@
           openMediaDetail,
           openModal: openMediaDetail,
           closeDetailView,
+          openPersonDetail,
+          closePersonView,
+          formatDate,
+          getAge,
           scrollToTop,
 
           onSearchInput,
