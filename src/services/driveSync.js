@@ -109,14 +109,32 @@ function setupTokenClient(onDataReceived, onStatusChange) {
     tokenClient = window.google.accounts.oauth2.initTokenClient({
       client_id: CLIENT_ID,
       scope: SCOPE,
+      error_callback: (err) => {
+        console.warn('OAuth GIS Error Callback:', err);
+        const errMsg = err?.message || err?.error || 'popup_blocked';
+        driveState.error = errMsg;
+        driveState.isSyncing = false;
+        driveState.isConnected = false;
+        if (onStatusChange) onStatusChange(driveState);
+        alert('Connexion bloquée : autorisez les cookies tiers et les pop-ups pour accounts.google.com dans votre navigateur.');
+      },
       callback: async (response) => {
         if (response.error) {
           console.warn('OAuth GIS Response error:', response.error);
+          let userNotice = `Erreur de connexion : ${response.error}`;
+          if (response.error === 'popup_closed' || response.error === 'popup_closed_by_user') {
+            userNotice = 'La fenêtre de connexion Google a été fermée avant la validation.';
+          } else if (response.error === 'access_denied') {
+            userNotice = "L'accès à Google Drive a été refusé par l'utilisateur.";
+          } else if (response.error === 'popup_blocked_by_browser' || (typeof response.error === 'string' && response.error.includes('cookie'))) {
+            userNotice = 'Connexion bloquée : autorisez les cookies tiers et les pop-ups pour accounts.google.com dans votre navigateur.';
+          }
           driveState.error = response.error;
           driveState.isSyncing = false;
           driveState.isConnected = false;
           localStorage.removeItem(TOKEN_INFO_KEY);
           if (onStatusChange) onStatusChange(driveState);
+          alert(userNotice);
           return;
         }
 
