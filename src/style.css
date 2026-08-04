@@ -778,29 +778,31 @@ body {
 }
 
 .modal-header-backdrop {
-  height: 240px;
+  height: 320px;
   background-size: cover;
   background-position: center;
   position: relative;
   display: flex;
   align-items: flex-end;
-  padding: 20px;
+  padding: 24px;
 }
 
 .modal-header-content {
   display: flex;
   gap: 20px;
   align-items: flex-end;
-  transform: translateY(30px);
+  transform: translateY(45px);
+  width: 100%;
 }
 
 .modal-poster {
-  width: 110px;
+  width: 130px;
   aspect-ratio: 2 / 3;
   object-fit: cover;
   border-radius: var(--radius-md);
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.7);
   border: 2px solid rgba(255, 255, 255, 0.2);
+  flex-shrink: 0;
 }
 
 .modal-meta-primary {
@@ -823,7 +825,7 @@ body {
 }
 
 .modal-body {
-  padding: 45px 24px 24px 24px;
+  padding: 55px 24px 24px 24px;
   display: flex;
   flex-direction: column;
   gap: 20px;
