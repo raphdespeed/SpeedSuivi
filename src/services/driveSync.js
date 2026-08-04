@@ -4,7 +4,10 @@
  * Scope: https://www.googleapis.com/auth/drive.appdata
  */
 
-const CLIENT_ID = '603945258667-0a9970mtho016qrg3tpv5vqcgupsaqk3.apps.googleusercontent.com';
+const CLIENT_ID = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_GOOGLE_CLIENT_ID)
+  ? import.meta.env.VITE_GOOGLE_CLIENT_ID
+  : '603945258667-0a9970mtho016qrg3tpv5vqcgupsaqk3.apps.googleusercontent.com';
+
 const SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
 const FILE_NAME = 'speedsuivi_data.json';
 const TOKEN_INFO_KEY = 'gdrive_token_info';
@@ -40,6 +43,115 @@ function saveTokenInfo(token, expiresInSeconds) {
     }));
   } catch (e) {
     console.error('Error storing gdrive_token_info:', e);
+  }
+}
+
+/**
+ * Active polling / promise helper to guarantee Google Identity Services (GIS) script loading.
+ * Dynamically reloads script if missing after 3 seconds.
+ */
+function ensureGISLoaded(timeoutMs = 3000) {
+  return new Promise((resolve) => {
+    if (window.google && window.google.accounts && window.google.accounts.oauth2) {
+      resolve(true);
+      return;
+    }
+
+    let elapsed = 0;
+    const interval = 100;
+    const checkTimer = setInterval(() => {
+      elapsed += interval;
+      if (window.google && window.google.accounts && window.google.accounts.oauth2) {
+        clearInterval(checkTimer);
+        resolve(true);
+        return;
+      }
+
+      if (elapsed >= timeoutMs) {
+        clearInterval(checkTimer);
+        console.warn('GIS SDK not ready after 3s, dynamically injecting script...');
+
+        const scriptId = 'google-gsi-script-dynamic';
+        let script = document.getElementById(scriptId);
+        if (!script) {
+          script = document.createElement('script');
+          script.id = scriptId;
+          script.src = 'https://accounts.google.com/gsi/client';
+          script.async = true;
+          script.defer = true;
+          document.head.appendChild(script);
+        }
+
+        let retryElapsed = 0;
+        const retryTimer = setInterval(() => {
+          retryElapsed += interval;
+          if (window.google && window.google.accounts && window.google.accounts.oauth2) {
+            clearInterval(retryTimer);
+            resolve(true);
+          } else if (retryElapsed >= 3000) {
+            clearInterval(retryTimer);
+            console.error('Failed to load Google Identity Services SDK.');
+            resolve(false);
+          }
+        }, interval);
+      }
+    }, interval);
+  });
+}
+
+/**
+ * Helper to initialize GIS Token Client
+ */
+function setupTokenClient(onDataReceived, onStatusChange) {
+  if (tokenClient || !window.google || !window.google.accounts || !window.google.accounts.oauth2) return;
+
+  try {
+    tokenClient = window.google.accounts.oauth2.initTokenClient({
+      client_id: CLIENT_ID,
+      scope: SCOPE,
+      callback: async (response) => {
+        if (response.error) {
+          console.warn('OAuth GIS Response error:', response.error);
+          driveState.error = response.error;
+          driveState.isSyncing = false;
+          driveState.isConnected = false;
+          localStorage.removeItem(TOKEN_INFO_KEY);
+          if (onStatusChange) onStatusChange(driveState);
+          return;
+        }
+
+        // Save fresh token to localStorage ({ accessToken, expiresAt })
+        saveTokenInfo(response.access_token, response.expires_in);
+
+        driveState.isConnected = true;
+        driveState.error = null;
+
+        // Fetch user profile using Google userInfo API
+        try {
+          const userRes = await fetchWithDriveAuth('https://www.googleapis.com/oauth2/v3/userinfo');
+          if (userRes && userRes.ok) {
+            const uData = await userRes.json();
+            driveState.user = {
+              email: uData.email,
+              name: uData.name || uData.email,
+              picture: uData.picture || null
+            };
+            localStorage.setItem(USER_KEY, JSON.stringify(driveState.user));
+          }
+        } catch (ue) {
+          console.warn('UserInfo fetch warning:', ue);
+        }
+
+        if (onStatusChange) onStatusChange(driveState);
+
+        // Perform sync with Google Drive appDataFolder
+        if (onDataReceived) {
+          await syncWithDrive(onDataReceived, onStatusChange);
+        }
+      }
+    });
+  } catch (e) {
+    console.error('Error setting up TokenClient:', e);
   }
 }
 
@@ -203,63 +315,12 @@ export function initDriveSync(onStatusChange, onDataReceived) {
       if (onStatusChange) onStatusChange(driveState);
     }
 
-    // 3. Initialize GIS Token Client in background (ready for user explicit click)
-    const checkGISLoaded = () => {
-      try {
-        if (window.google && window.google.accounts && window.google.accounts.oauth2) {
-          tokenClient = window.google.accounts.oauth2.initTokenClient({
-            client_id: CLIENT_ID,
-            scope: SCOPE,
-            callback: async (response) => {
-              if (response.error) {
-                console.warn('OAuth GIS Response error:', response.error);
-                driveState.error = response.error;
-                driveState.isSyncing = false;
-                driveState.isConnected = false;
-                localStorage.removeItem(TOKEN_INFO_KEY);
-                if (onStatusChange) onStatusChange(driveState);
-                return;
-              }
-
-              // Save fresh token to localStorage ({ accessToken, expiresAt })
-              saveTokenInfo(response.access_token, response.expires_in);
-
-              driveState.isConnected = true;
-              driveState.error = null;
-
-              // Fetch user profile using Google userInfo API
-              try {
-                const userRes = await fetchWithDriveAuth('https://www.googleapis.com/oauth2/v3/userinfo');
-                if (userRes && userRes.ok) {
-                  const uData = await userRes.json();
-                  driveState.user = {
-                    email: uData.email,
-                    name: uData.name || uData.email,
-                    picture: uData.picture || null
-                  };
-                  localStorage.setItem(USER_KEY, JSON.stringify(driveState.user));
-                }
-              } catch (ue) {
-                console.warn('UserInfo fetch warning:', ue);
-              }
-
-              if (onStatusChange) onStatusChange(driveState);
-
-              // Perform sync with Google Drive appDataFolder
-              if (onDataReceived) {
-                await syncWithDrive(onDataReceived, onStatusChange);
-              }
-            }
-          });
-        } else {
-          setTimeout(checkGISLoaded, 300);
-        }
-      } catch (gisError) {
-        console.warn('Google Identity Services initialization warning:', gisError);
+    // 3. Actively ensure GIS script is loaded and initialize TokenClient
+    ensureGISLoaded(3000).then((isLoaded) => {
+      if (isLoaded) {
+        setupTokenClient(onDataReceived, onStatusChange);
       }
-    };
-
-    checkGISLoaded();
+    });
   } catch (initErr) {
     console.error('initDriveSync top-level error caught gracefully:', initErr);
     driveState.isConnected = false;
@@ -270,12 +331,17 @@ export function initDriveSync(onStatusChange, onDataReceived) {
 /**
  * Trigger explicit OAuth login flow with user consent upon explicit click
  */
-export function loginGoogleDrive() {
+export async function loginGoogleDrive(onDataReceived, onStatusChange) {
   try {
+    const isReady = await ensureGISLoaded(2000);
+    if (isReady && !tokenClient) {
+      setupTokenClient(onDataReceived, onStatusChange || statusChangeCallback);
+    }
+
     if (tokenClient) {
       tokenClient.requestAccessToken({ prompt: 'consent' });
     } else {
-      alert("Le service Google Identity n'est pas encore prêt. Veuillez réessayer dans un instant.");
+      alert("Le service Google Identity n'est pas encore prêt. Veuillez recharger la page ou réessayer dans un instant.");
     }
   } catch (e) {
     console.error('Error triggering Google Drive login:', e);
