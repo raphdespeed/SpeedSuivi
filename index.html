@@ -953,7 +953,7 @@
 
   <!-- Application Logic (Vue 3 standalone) -->
   <script>
-    const { createApp, ref, computed, onMounted, onUnmounted } = Vue;
+    const { createApp, ref, computed, onMounted, onUnmounted, watch } = Vue;
 
     // Secure Nginx Proxy Endpoint (API Key managed server-side)
     const BASE_URL = 'https://api-speedsuivi.raphdespeed.online/3';
@@ -1055,10 +1055,10 @@
           return list;
         });
 
-        // Load collection from localStorage
+        // Load collection from localStorage synchronously before state initialization
         const loadCollection = () => {
           try {
-            const saved = localStorage.getItem('media_tracker_v2');
+            const saved = localStorage.getItem('media_tracker_v2') || localStorage.getItem('media_tracker_library_v1');
             if (saved) {
               collection.value = JSON.parse(saved);
               collection.value.forEach(item => enrichWatchProviders(item));
@@ -1075,6 +1075,18 @@
             console.error('Error saving collection:', e);
           }
         };
+
+        // Synchronous initial load of saved collection
+        loadCollection();
+
+        // Reactive Deep Watcher for automatic synchronous persistence of all progress changes
+        watch(collection, (newVal) => {
+          try {
+            localStorage.setItem('media_tracker_v2', JSON.stringify(newVal));
+          } catch (e) {
+            console.error('Error in deep collection watcher:', e);
+          }
+        }, { deep: true });
 
         // Category detection
         const detectCategory = (item) => {

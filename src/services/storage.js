@@ -1,11 +1,12 @@
-const STORAGE_KEY = 'media_tracker_library_v1';
+const STORAGE_KEY = 'media_tracker_v2';
+const FALLBACK_KEY = 'media_tracker_library_v1';
 
 /**
  * Get all media items stored in localStorage
  */
 export function getCollection() {
   try {
-    const data = localStorage.getItem(STORAGE_KEY);
+    const data = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(FALLBACK_KEY);
     return data ? JSON.parse(data) : [];
   } catch (error) {
     console.error('Error reading localStorage:', error);
@@ -14,7 +15,7 @@ export function getCollection() {
 }
 
 /**
- * Save collection to localStorage
+ * Save collection to localStorage synchronously
  */
 export function saveCollection(items) {
   try {
