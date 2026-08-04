@@ -106,8 +106,8 @@
 
   <div id="app" class="flex-1 flex flex-col">
 
-    <!-- ================= ROUTE 3: MAIN DASHBOARD & SEARCH VIEW ================= -->
-    <div v-else class="flex-1 flex flex-col">
+    <!-- ================= ROUTE 1: MAIN DASHBOARD & SEARCH VIEW ================= -->
+    <div v-if="currentRoute === 'dashboard'" class="flex-1 flex flex-col">
       <!-- Header Navigation Bar -->
       <header class="sticky top-0 z-50 glass-header border-b border-white/10 px-4 py-3 md:px-8">
       <div class="max-w-7xl mx-auto flex items-center justify-between gap-4">
@@ -943,7 +943,7 @@
     </div>
 
     <!-- ================= ROUTE 2: FULL PAGE MEDIA DETAIL VIEW ================= -->
-    <div v-else-if="currentRoute === 'media'" class="min-h-screen bg-darkBg text-white flex flex-col flex-1 pb-24 animate-fadeIn relative z-40">
+    <div v-else-if="currentRoute === 'media'" class="min-h-screen bg-darkBg text-white flex flex-col flex-1 pb-24 animate-fadeIn relative z-40" key="media-view">
       
       <!-- Sticky Top Back Bar -->
       <div class="sticky top-4 left-4 md:top-6 md:left-8 z-50 px-4 md:px-8">
@@ -1221,8 +1221,8 @@
 
     </div>
 
-    <!-- ================= ROUTE 1: FULL PAGE PERSON / ACTOR VIEW (TMDB 2-COLUMNS STYLE) ================= -->
-    <div v-if="currentRoute === 'actor'" class="min-h-screen bg-darkBg text-white flex flex-col flex-1 pb-24 animate-fadeIn relative z-40">
+    <!-- ================= ROUTE 3: FULL PAGE PERSON / ACTOR VIEW (TMDB 2-COLUMNS STYLE) ================= -->
+    <div v-else-if="currentRoute === 'actor'" class="min-h-screen bg-darkBg text-white flex flex-col flex-1 pb-24 animate-fadeIn relative z-40" key="actor-view">
       
       <!-- Sticky Top Back Bar -->
       <div class="sticky top-4 left-4 md:top-6 md:left-8 z-50 px-4 md:px-8">
