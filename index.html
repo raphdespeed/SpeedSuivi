@@ -292,18 +292,12 @@
                   <span>🔄</span>
                 </button>
 
-                <!-- Category, Language & Rating Badges -->
+                <!-- Category & Rating Badges -->
                 <div class="absolute top-2 left-2 flex flex-wrap gap-1 pr-10">
                   <span 
                     :class="['text-[10px] font-heading font-bold px-2 py-0.5 rounded backdrop-blur-md shadow', item.category === 'kdrama' ? 'bg-pink-600/90 text-white' : item.category === 'anime' ? 'bg-purple-600/90 text-white' : 'bg-black/80 text-white']"
                   >
                     {{ getCategoryBadge(item.category) }}
-                  </span>
-                  <span 
-                    :class="['text-[10px] font-heading font-bold px-1.5 py-0.5 rounded backdrop-blur-md shadow border', getLanguageBadgeClass(item)]"
-                    :title="'Langue : ' + getLanguageStatus(item)"
-                  >
-                    {{ getLanguageStatus(item) }}
                   </span>
                   <span v-if="item.year" class="bg-black/60 backdrop-blur-md text-gray-300 text-[10px] font-heading px-1.5 py-0.5 rounded">
                     {{ item.year }}
@@ -435,12 +429,6 @@
                   >
                     {{ getCategoryBadge(item.category) }}
                   </span>
-                  <span 
-                    :class="['text-[10px] font-heading font-bold px-1.5 py-0.5 rounded backdrop-blur-md shadow border', getLanguageBadgeClass(item)]"
-                    :title="'Langue : ' + getLanguageStatus(item)"
-                  >
-                    {{ getLanguageStatus(item) }}
-                  </span>
                   <span v-if="item.voteAverage" class="bg-amber-500/20 border border-amber-500/40 text-amber-400 text-[10px] font-heading font-bold px-1.5 py-0.5 rounded">
                     ⭐ {{ item.voteAverage }}
                   </span>
@@ -564,12 +552,6 @@
                   :class="['text-[10px] font-heading font-bold px-2 py-0.5 rounded backdrop-blur-md shadow', item.category === 'kdrama' ? 'bg-pink-600/90 text-white' : item.category === 'anime' ? 'bg-purple-600/90 text-white' : 'bg-black/80 text-white']"
                 >
                   {{ getCategoryBadge(item.category) }}
-                </span>
-                <span 
-                  :class="['text-[10px] font-heading font-bold px-1.5 py-0.5 rounded backdrop-blur-md shadow border', getLanguageBadgeClass(item)]"
-                  :title="'Langue : ' + getLanguageStatus(item)"
-                >
-                  {{ getLanguageStatus(item) }}
                 </span>
                 <span v-if="item.year" class="bg-black/60 backdrop-blur-md text-gray-300 text-[10px] font-heading px-1.5 py-0.5 rounded">
                   {{ item.year }}
@@ -760,12 +742,6 @@
                   :class="['text-[11px] font-heading font-bold px-2 py-0.5 rounded shadow', selectedMedia.category === 'kdrama' ? 'bg-pink-600 text-white' : selectedMedia.category === 'anime' ? 'bg-purple-600 text-white' : 'bg-netflixRed text-white']"
                 >
                   {{ getCategoryBadge(selectedMedia.category) }}
-                </span>
-                <span 
-                  :class="['text-[11px] font-heading font-bold px-2 py-0.5 rounded shadow border', getLanguageBadgeClass(selectedMedia)]"
-                  :title="'Langue disponible : ' + getLanguageStatus(selectedMedia)"
-                >
-                  💬 {{ getLanguageStatus(selectedMedia) }}
                 </span>
                 <span v-if="selectedMedia.year" class="bg-black/60 text-gray-300 text-[11px] font-heading px-2 py-0.5 rounded">
                   {{ selectedMedia.year }}
@@ -1067,8 +1043,6 @@
             category: category,
             title: title,
             originalTitle: raw.original_title || raw.original_name || '',
-            originalLanguage: raw.original_language || '',
-            translations: raw.translations || null,
             overview: raw.overview || 'Aucun synopsis disponible.',
             posterPath: posterUrl,
             backdropPath: raw.backdrop_path ? `${BACKDROP_BASE}${raw.backdrop_path}` : null,
@@ -1429,23 +1403,19 @@
           // Fetch watch providers for modal item
           await enrichWatchProviders(activeItem);
 
-          // Fetch full episode details & translations if needed
-          try {
-            const type = activeItem.mediaType === 'movie' ? 'movie' : 'tv';
-            const res = await fetch(`${BASE_URL}/${type}/${activeItem.tmdbId}?language=fr-FR&append_to_response=translations`);
-            const data = await res.json();
-            if (data.number_of_episodes) {
-              selectedMedia.value.totalEpisodes = data.number_of_episodes;
-              selectedMedia.value.totalSeasons = data.number_of_seasons || 1;
+          // Fetch full episode details if needed
+          if (!activeItem.totalEpisodes || activeItem.totalEpisodes === 12) {
+            try {
+              const type = activeItem.mediaType === 'movie' ? 'movie' : 'tv';
+              const res = await fetch(`${BASE_URL}/${type}/${activeItem.tmdbId}?language=fr-FR`);
+              const data = await res.json();
+              if (data.number_of_episodes) {
+                selectedMedia.value.totalEpisodes = data.number_of_episodes;
+                selectedMedia.value.totalSeasons = data.number_of_seasons || 1;
+              }
+            } catch (e) {
+              console.error(e);
             }
-            if (data.translations) {
-              selectedMedia.value.translations = data.translations;
-            }
-            if (data.original_language) {
-              selectedMedia.value.originalLanguage = data.original_language;
-            }
-          } catch (e) {
-            console.error(e);
           }
 
           // Fetch Recommendations & Similar Titles via Nginx Proxy
@@ -1504,39 +1474,6 @@
         const getCategoryBadge = (cat) => {
           const map = { movie: '🎬 Film', series: '📺 Série', anime: '🇯🇵 Animé', kdrama: '🇰🇷 K-Drama' };
           return map[cat] || '📺 Série';
-        };
-
-        const getLanguageStatus = (item) => {
-          if (!item) return 'VO';
-          const origLang = item.originalLanguage || item.original_language || '';
-
-          // 1. Langue originale française -> "VF" (Vert)
-          if (origLang === 'fr') {
-            return 'VF';
-          }
-
-          // 2. Traduction française TMDB & original_language !== 'fr' -> "VOSTFR" (Orange)
-          const translationsList = item.translations?.translations || (Array.isArray(item.translations) ? item.translations : null);
-          if (translationsList && translationsList.length > 0) {
-            const frTrans = translationsList.find(t => t.iso_639_1 === 'fr');
-            if (frTrans) {
-              return 'VOSTFR';
-            }
-            return 'VO';
-          }
-
-          if (origLang && origLang !== 'fr') {
-            return 'VOSTFR';
-          }
-
-          return 'VO';
-        };
-
-        const getLanguageBadgeClass = (item) => {
-          const status = getLanguageStatus(item);
-          if (status === 'VF') return 'bg-emerald-600/90 text-white border-emerald-400/40';
-          if (status === 'VOSTFR') return 'bg-amber-600/90 text-white border-amber-400/40';
-          return 'bg-slate-600/90 text-gray-200 border-slate-400/40';
         };
 
         const getProviderLabel = (provIdStr) => {
@@ -1704,8 +1641,6 @@
           saveModalChanges,
           getProgressPercent,
           getCategoryBadge,
-          getLanguageStatus,
-          getLanguageBadgeClass,
           getProviderLabel,
           getItemStatus,
           isItemSaved,
