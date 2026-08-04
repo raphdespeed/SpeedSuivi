@@ -157,10 +157,8 @@
 
   <div id="app" class="flex-1 flex flex-col">
 
-    <!-- ================= ROUTE 1: MAIN DASHBOARD & SEARCH VIEW ================= -->
-    <div v-if="currentRoute === 'dashboard'" class="flex-1 flex flex-col">
-      <!-- Header Navigation Bar -->
-      <header class="sticky top-0 z-50 glass-header border-b border-white/10 px-4 py-3 md:px-8">
+    <!-- HEADER GLOBAL PERSISTANT (toujours visible sur toutes les vues) -->
+    <header class="sticky top-0 z-50 glass-header border-b border-white/10 px-4 py-3 md:px-8">
       <div class="max-w-7xl mx-auto flex items-center justify-between gap-4">
         
         <!-- Logo -->
@@ -249,38 +247,57 @@
         </div>
 
       </div>
+    </header>
 
-      <!-- Sub-Bar Filters: 3 Clean Structured Rows -->
-      <div class="max-w-7xl mx-auto mt-3 space-y-2">
-        <!-- Row 1: TYPE Pills -->
-        <div class="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar flex-nowrap">
-          <span class="text-[11px] font-heading font-bold text-gray-400 uppercase tracking-wider shrink-0">Type :</span>
+    <!-- ================= ROUTE 1: MAIN DASHBOARD & SEARCH VIEW ================= -->
+    <div v-if="currentRoute === 'dashboard'" class="flex-1 flex flex-col">
+
+      <!-- Search & Unified Filter Bar (Dashboard Top) -->
+      <div class="max-w-7xl mx-auto w-full px-4 md:px-8 pt-4 pb-2 space-y-3">
+        <!-- Search Input (Full Width Centered) -->
+        <div class="relative max-w-3xl mx-auto">
+          <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-lg">🔍</span>
+          <input 
+            v-model="searchQuery"
+            @input="onSearchInput"
+            type="text"
+            placeholder="Rechercher un film, une série, un animé, un K-Drama..."
+            class="w-full bg-surfaceBg border-2 border-white/10 rounded-2xl pl-12 pr-10 py-3 text-white font-body placeholder-gray-500 focus:outline-none focus:border-netflixRed focus:ring-4 focus:ring-netflixRed/20 transition-all text-sm md:text-base"
+            ref="searchInputRef"
+          />
           <button 
-            v-for="filter in filterOptions" 
-            :key="filter.id"
-            @click="onSelectCategoryFilter(filter.id)"
-            :class="['text-xs font-heading font-semibold px-3.5 py-1.5 rounded-full whitespace-nowrap border transition-all shrink-0', activeFilter === filter.id ? 'bg-netflixRed/20 border-netflixRed text-white font-bold' : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10 hover:text-white']"
-          >
-            {{ filter.label }}
-          </button>
+            v-if="searchQuery" 
+            @click="searchQuery = ''; onSearchInput();"
+            class="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white text-xl"
+          >&times;</button>
         </div>
 
-        <!-- Row 2: PLATEFORME FR Pills (Single continuous row with smooth scroll) -->
-        <div class="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar flex-nowrap pt-1 border-t border-white/5">
-          <span class="text-[11px] font-heading font-bold text-gray-400 uppercase tracking-wider shrink-0">Plateforme FR :</span>
-          <button 
-            v-for="provider in providerFilters"
-            :key="provider.id"
-            @click="onSelectProviderFilter(provider.id)"
-            :class="['text-xs font-heading font-semibold px-3 py-1.5 rounded-full whitespace-nowrap border transition-all flex items-center gap-1.5 shrink-0', activeProviderFilter === provider.id ? 'bg-white/20 border-white text-white font-bold' : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10 hover:text-white']"
-          >
-            <span>{{ provider.icon }}</span>
-            <span>{{ provider.label }}</span>
-          </button>
-        </div>
+        <!-- Unified Filter Bar (Single Row Dropdowns) -->
+        <div class="flex flex-wrap items-center justify-center gap-2 md:gap-3 bg-black/30 p-2.5 rounded-2xl border border-white/10">
+          <!-- Type Dropdown -->
+          <div class="flex items-center gap-1.5 shrink-0">
+            <span class="text-[11px] font-heading font-bold text-gray-400 uppercase tracking-wider">🎯 Type :</span>
+            <select 
+              v-model="activeFilter" 
+              @change="onFilterChange"
+              class="bg-surfaceBg border border-white/15 rounded-xl px-2.5 py-1 text-xs font-heading font-semibold text-white focus:outline-none focus:border-netflixRed cursor-pointer"
+            >
+              <option v-for="filter in filterOptions" :key="filter.id" :value="filter.id">{{ filter.label }}</option>
+            </select>
+          </div>
 
-        <!-- Row 3: Genre & Year Filters -->
-        <div class="flex items-center gap-3 overflow-x-auto pb-1 no-scrollbar flex-nowrap pt-1 border-t border-white/5">
+          <!-- Plateforme Dropdown -->
+          <div class="flex items-center gap-1.5 shrink-0">
+            <span class="text-[11px] font-heading font-bold text-gray-400 uppercase tracking-wider">📺 Plateforme :</span>
+            <select 
+              v-model="activeProviderFilter" 
+              @change="onFilterChange"
+              class="bg-surfaceBg border border-white/15 rounded-xl px-2.5 py-1 text-xs font-heading font-semibold text-white focus:outline-none focus:border-netflixRed cursor-pointer"
+            >
+              <option v-for="provider in providerFilters" :key="provider.id" :value="provider.id">{{ provider.icon }} {{ provider.label }}</option>
+            </select>
+          </div>
+
           <!-- Genre Dropdown -->
           <div class="flex items-center gap-1.5 shrink-0">
             <span class="text-[11px] font-heading font-bold text-gray-400 uppercase tracking-wider">🎭 Genre :</span>
@@ -310,14 +327,13 @@
           <button 
             v-if="hasActiveFilters" 
             @click="resetAllFilters"
-            class="text-[11px] font-heading font-bold text-netflixRed hover:text-white bg-netflixRed/10 hover:bg-netflixRed border border-netflixRed/30 px-2.5 py-1 rounded-xl transition-all ml-auto flex items-center gap-1 shrink-0 whitespace-nowrap"
+            class="text-[11px] font-heading font-bold text-netflixRed hover:text-white bg-netflixRed/10 hover:bg-netflixRed border border-netflixRed/30 px-2.5 py-1 rounded-xl transition-all flex items-center gap-1 shrink-0 whitespace-nowrap ml-auto md:ml-0"
             title="Réinitialiser tous les filtres"
           >
             <span>🔄</span> Réinitialiser
           </button>
         </div>
       </div>
-    </header>
 
     <!-- Main App Container -->
     <main class="max-w-7xl w-full mx-auto p-4 md:p-8 flex-1 pb-24 md:pb-12">
@@ -461,28 +477,6 @@
 
       <!-- ================= SEARCH TAB ================= -->
       <div v-if="activeTab === 'search'" class="space-y-6 animate-fadeIn">
-        <div class="space-y-1">
-          <h2 class="font-heading font-bold text-2xl md:text-3xl text-white">🔍 Rechercher sur SpeedSuivi</h2>
-          <p class="text-gray-400 text-sm">Recherche globale tolérante via le proxy sécurisé SpeedSuivi.</p>
-        </div>
-
-        <!-- STABLE SEARCH INPUT (NEVER LOSES FOCUS) -->
-        <div class="relative">
-          <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-lg">🔍</span>
-          <input 
-            v-model="searchQuery"
-            @input="onSearchInput"
-            type="text"
-            placeholder="Rechercher par titre (ex: Queen Woo, The Batman, Squid Game, Attack on Titan...)"
-            class="w-full bg-surfaceBg border-2 border-white/10 rounded-2xl pl-12 pr-10 py-3.5 text-white font-body placeholder-gray-500 focus:outline-none focus:border-netflixRed focus:ring-4 focus:ring-netflixRed/20 transition-all text-base"
-            ref="searchInputRef"
-          />
-          <button 
-            v-if="searchQuery" 
-            @click="searchQuery = ''; onSearchInput();"
-            class="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white text-xl"
-          >&times;</button>
-        </div>
 
         <!-- Initial Search Loading State -->
         <div v-if="isSearching" class="flex justify-center py-12">
@@ -997,7 +991,7 @@
     <div v-else-if="currentRoute === 'media'" class="min-h-screen bg-darkBg text-white flex flex-col flex-1 pb-24 animate-fadeIn relative z-40" key="media-view">
       
       <!-- Sticky Top Back Bar -->
-      <div class="sticky top-4 left-4 md:top-6 md:left-8 z-50 px-4 md:px-8">
+      <div class="sticky top-[72px] left-4 md:top-[72px] md:left-8 z-50 px-4 md:px-8">
         <button 
           @click="closeDetailView"
           class="inline-flex items-center gap-2 bg-black/80 hover:bg-netflixRed text-white text-xs md:text-sm font-heading font-bold px-4 py-2.5 rounded-full border border-white/20 shadow-2xl backdrop-blur-md transition-all active:scale-95 group"
@@ -1009,7 +1003,7 @@
 
       <!-- Hero Backdrop Header (~400px - 480px) -->
       <div 
-        class="h-[380px] md:h-[480px] bg-cover bg-center relative flex items-end p-6 md:p-12 shrink-0 border-b border-white/10 -mt-14"
+        class="h-[380px] md:h-[480px] bg-cover bg-top relative flex items-end p-6 md:p-12 shrink-0 border-b border-white/10 -mt-14"
         :style="{ backgroundImage: selectedMedia.backdropPath ? `linear-gradient(to bottom, rgba(11, 13, 18, 0.3) 0%, rgba(11, 13, 18, 0.8) 65%, rgba(11, 13, 18, 1) 100%), url('${selectedMedia.backdropPath}')` : 'none' }"
       >
         <div class="max-w-6xl mx-auto w-full flex flex-col md:flex-row gap-6 md:gap-8 items-end transform translate-y-16 md:translate-y-20 z-10">
@@ -1300,7 +1294,7 @@
     <div v-else-if="currentRoute === 'actor'" class="min-h-screen bg-darkBg text-white flex flex-col flex-1 pb-24 animate-fadeIn relative z-40" key="actor-view">
       
       <!-- Sticky Top Back Bar -->
-      <div class="sticky top-4 left-4 md:top-6 md:left-8 z-50 px-4 md:px-8">
+      <div class="sticky top-[72px] left-4 md:top-[72px] md:left-8 z-50 px-4 md:px-8">
         <button 
           @click="closePersonView"
           class="inline-flex items-center gap-2 bg-black/80 hover:bg-netflixRed text-white text-xs md:text-sm font-heading font-bold px-4 py-2.5 rounded-full border border-white/20 shadow-2xl backdrop-blur-md transition-all active:scale-95 group"
@@ -1539,7 +1533,7 @@
 
   <!-- Application Logic (Vue 3 standalone) -->
   <script>
-    const { createApp, ref, computed, onMounted, onUnmounted, watch } = Vue;
+    const { createApp, ref, computed, onMounted, onUnmounted, watch, nextTick } = Vue;
 
     // Secure Nginx Proxy Endpoint (API Key managed server-side)
     const BASE_URL = 'https://api-speedsuivi.raphdespeed.online/3';
@@ -1839,7 +1833,12 @@
           }
         };
 
+        const savedScrollY = ref(0);
+
         const openMediaDetail = async (item, updateHash = true) => {
+          if (currentRoute.value === 'dashboard') {
+            savedScrollY.value = window.scrollY;
+          }
           selectedPerson.value = null;
           selectedMedia.value = item;
           modalStatus.value = item.status || 'in_progress';
@@ -1861,6 +1860,9 @@
           if (!personId) {
             selectedPerson.value = null;
             return;
+          }
+          if (currentRoute.value === 'dashboard' || currentRoute.value === 'media') {
+            savedScrollY.value = window.scrollY;
           }
           selectedMedia.value = null;
           isLoadingPerson.value = true;
@@ -1975,7 +1977,9 @@
           if (window.location.hash.startsWith('#actor/')) {
             window.history.back();
           }
-          window.scrollTo({ top: 0, behavior: 'instant' });
+          nextTick(() => {
+            window.scrollTo({ top: savedScrollY.value, behavior: 'instant' });
+          });
         };
 
         const fetchExtendedMediaDetails = async (item) => {
@@ -2004,7 +2008,9 @@
           if (window.location.hash.startsWith('#media/')) {
             window.history.back();
           }
-          window.scrollTo({ top: 0, behavior: 'instant' });
+          nextTick(() => {
+            window.scrollTo({ top: savedScrollY.value, behavior: 'instant' });
+          });
         };
 
         const fetchMediaByIdAndOpen = async (mediaId) => {
@@ -2173,6 +2179,10 @@
             isSearching.value = false;
             fetchDiscoveryContent(1);
             return;
+          }
+
+          if (activeTab.value !== 'search') {
+            activeTab.value = 'search';
           }
 
           activeFilter.value = 'all';
@@ -2689,6 +2699,7 @@
           collection,
           selectedMedia,
           selectedPerson,
+          savedScrollY,
           isLoadingPerson,
           showFullBio,
           activeLightboxImage,
