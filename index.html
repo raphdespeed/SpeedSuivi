@@ -700,7 +700,7 @@
                 <!-- Category & Rating Badges -->
                 <div class="absolute top-2 left-2 flex flex-wrap gap-1 pr-10">
                   <span 
-                    :class="['text-[10px] font-heading font-bold px-2 py-0.5 rounded backdrop-blur-md shadow', item.category === 'kdrama' ? 'bg-pink-600/90 text-white' : item.category === 'anime' ? 'bg-purple-600/90 text-white' : 'bg-black/80 text-white']"
+                    :class="['text-[10px] font-heading font-bold px-2 py-0.5 rounded backdrop-blur-md shadow', item.category === 'saga' ? 'bg-amber-600/90 text-white font-extrabold' : item.category === 'kdrama' ? 'bg-pink-600/90 text-white' : item.category === 'anime' ? 'bg-purple-600/90 text-white' : 'bg-black/80 text-white']"
                   >
                     {{ getCategoryBadge(item.category) }}
                   </span>
@@ -853,7 +853,7 @@
 
                 <div class="absolute top-2 left-2 flex flex-wrap gap-1 pr-10">
                   <span 
-                    :class="['text-[10px] font-heading font-bold px-2 py-0.5 rounded backdrop-blur-md shadow', item.category === 'kdrama' ? 'bg-pink-600/90 text-white' : item.category === 'anime' ? 'bg-purple-600/90 text-white' : 'bg-black/80 text-white']"
+                    :class="['text-[10px] font-heading font-bold px-2 py-0.5 rounded backdrop-blur-md shadow', item.category === 'saga' ? 'bg-amber-600/90 text-white font-extrabold' : item.category === 'kdrama' ? 'bg-pink-600/90 text-white' : item.category === 'anime' ? 'bg-purple-600/90 text-white' : 'bg-black/80 text-white']"
                   >
                     {{ getCategoryBadge(item.category) }}
                   </span>
@@ -988,7 +988,7 @@
 
               <div class="absolute top-2 left-2 flex flex-wrap gap-1 pr-10">
                 <span 
-                  :class="['text-[10px] font-heading font-bold px-2 py-0.5 rounded backdrop-blur-md shadow', item.category === 'kdrama' ? 'bg-pink-600/90 text-white' : item.category === 'anime' ? 'bg-purple-600/90 text-white' : 'bg-black/80 text-white']"
+                  :class="['text-[10px] font-heading font-bold px-2 py-0.5 rounded backdrop-blur-md shadow', item.category === 'saga' ? 'bg-amber-600/90 text-white font-extrabold' : item.category === 'kdrama' ? 'bg-pink-600/90 text-white' : item.category === 'anime' ? 'bg-purple-600/90 text-white' : 'bg-black/80 text-white']"
                 >
                   {{ getCategoryBadge(item.category) }}
                 </span>
@@ -1226,7 +1226,7 @@
           </div>
           <div class="space-y-3 flex-1 min-w-0">
             <div class="flex flex-wrap gap-2 items-center">
-              <span :class="['text-xs font-heading font-bold px-3 py-1 rounded-full shadow-lg', selectedMedia.category === 'kdrama' ? 'bg-pink-600 text-white' : selectedMedia.category === 'anime' ? 'bg-purple-600 text-white' : 'bg-netflixRed text-white']">
+              <span :class="['text-xs font-heading font-bold px-3 py-1 rounded-full shadow-lg', selectedMedia.category === 'saga' ? 'bg-amber-600 text-white font-extrabold shadow-amber-600/30' : selectedMedia.category === 'kdrama' ? 'bg-pink-600 text-white' : selectedMedia.category === 'anime' ? 'bg-purple-600 text-white' : 'bg-netflixRed text-white']">
                 {{ getCategoryBadge(selectedMedia.category) }}
               </span>
               <span v-if="selectedMedia.year" class="bg-black/60 backdrop-blur-md text-gray-300 text-xs font-heading px-3 py-1 rounded-full border border-white/10">
@@ -1910,10 +1910,11 @@
 
         const filterOptions = [
           { id: 'all', label: 'Tous les types' },
+          { id: 'movie', label: '🎬 Films' },
           { id: 'series', label: '📺 Séries' },
+          { id: 'saga', label: '🏰 Sagas & Franchises' },
           { id: 'anime', label: '🇯🇵 Animés' },
-          { id: 'kdrama', label: '🇰🇷 K-Dramas' },
-          { id: 'movie', label: '🎬 Films' }
+          { id: 'kdrama', label: '🇰🇷 K-Dramas' }
         ];
 
         // TMDB Watch Provider IDs in France
@@ -2036,8 +2037,33 @@
 
         const activeLightboxImage = ref(null);
 
+        const SAGA_KEYWORDS = [
+          'harry potter', 'star wars', 'seigneur des anneaux', 'lord of the rings',
+          'fast & furious', 'fast and furious', 'marvel', 'avengers', 'spider-man',
+          'spiderman', 'batman', 'pirates des caraïbes', 'pirates of the caribbean',
+          'james bond', 'jurassic', 'indiana jones', 'matrix', 'hunger games',
+          'twilight', 'mission: impossible', 'mission impossible', 'x-men',
+          'alien', 'terminator', 'john wick', 'transformers', 'shrek',
+          'toy story', 'l\'âge de glace', 'ice age', 'planète des singes',
+          'planet of the apes', 'conjuring', 'mad max', 'die hard', 'saw',
+          'resident evil', 'divergente', 'maze runner', 'le labyrinthe', 'the hobbit',
+          'le hobbit', 'despicable me', 'moi, moche et méchant', 'minions',
+          'le parrain', 'the godfather', 'back to the future', 'retour vers le futur',
+          'dune', 'game of thrones', 'house of the dragon'
+        ];
+
         // Category detection
         const detectCategory = (item) => {
+          if (item.category === 'saga' || item.isSaga) return 'saga';
+
+          const hasCollection = !!(item.belongs_to_collection || item.belongsToCollection || item.collectionName || item.belongs_to_collection?.id);
+          const titleLower = (item.title || item.name || item.original_title || item.original_name || '').toLowerCase();
+          
+          const isSagaTitle = SAGA_KEYWORDS.some(kw => titleLower.includes(kw));
+          if (hasCollection || isSagaTitle) {
+            return 'saga';
+          }
+
           if (item.media_type === 'movie' || (!item.media_type && item.title && !item.name)) {
             return 'movie';
           }
@@ -2821,7 +2847,35 @@
             const isAnyFilterActive = activeFilter.value !== 'all' || activeProviderFilter.value !== 'all' || activeGenreFilter.value !== 'all' || activeYearFilter.value !== 'all';
 
             if (isAnyFilterActive) {
-              if (activeFilter.value === 'kdrama') {
+              if (activeFilter.value === 'saga') {
+                const sagaQueries = ['Harry Potter', 'Star Wars', 'Le Seigneur des Anneaux', 'Fast and Furious', 'Avengers', 'Spider-Man', 'Pirates des Caraïbes', 'Jurassic Park', 'Indiana Jones', 'Matrix', 'Hunger Games', 'Mission Impossible', 'John Wick', 'X-Men', 'Transformers', 'Twilight', 'Batman', 'Alien', 'Shrek'];
+                const pageQueries = sagaQueries.slice((page - 1) * 6, page * 6);
+                
+                if (pageQueries.length > 0) {
+                  const sagaFetches = pageQueries.map(q => 
+                    fetch(`${BASE_URL}/search/multi?language=fr-FR&query=${encodeURIComponent(q)}&page=1&include_adult=false`)
+                      .then(r => r.ok ? r.json() : { results: [] })
+                      .catch(() => ({ results: [] }))
+                  );
+                  const sagaResults = await Promise.all(sagaFetches);
+                  const combinedSagas = [];
+                  sagaResults.forEach(res => {
+                    if (res.results) {
+                      res.results.filter(i => i.poster_path).slice(0, 3).forEach(i => combinedSagas.push(formatItem({ ...i, category: 'saga', isSaga: true })));
+                    }
+                  });
+
+                  if (append) {
+                    trendingResults.value = [...trendingResults.value, ...combinedSagas];
+                  } else {
+                    trendingResults.value = combinedSagas;
+                    trendingPage.value = 1;
+                  }
+                  totalTrendingPages.value = 3;
+                  combinedSagas.forEach(item => enrichWatchProviders(item));
+                  return;
+                }
+              } else if (activeFilter.value === 'kdrama') {
                 if (shouldFetchTV) {
                   tvUrl = `${BASE_URL}/discover/tv?with_origin_country=KR&with_original_language=ko&language=fr-FR&sort_by=popularity.desc&page=${page}${providerParam}${genreString}${tvYearParam}`;
                 }
@@ -3070,7 +3124,7 @@
         };
 
         const getCategoryBadge = (cat) => {
-          const map = { movie: '🎬 Film', series: '📺 Série', anime: '🇯🇵 Animé', kdrama: '🇰🇷 K-Drama' };
+          const map = { movie: '🎬 Film', series: '📺 Série', saga: '🏰 Saga', anime: '🇯🇵 Animé', kdrama: '🇰🇷 K-Drama' };
           return map[cat] || '📺 Série';
         };
 

@@ -3,10 +3,35 @@ export const POSTER_BASE = 'https://image.tmdb.org/t/p/w500';
 export const BACKDROP_BASE = 'https://image.tmdb.org/t/p/w1280';
 export const PLACEHOLDER_POSTER = 'https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=500&auto=format&fit=crop&q=80';
 
+const SAGA_KEYWORDS = [
+  'harry potter', 'star wars', 'seigneur des anneaux', 'lord of the rings',
+  'fast & furious', 'fast and furious', 'marvel', 'avengers', 'spider-man',
+  'spiderman', 'batman', 'pirates des caraïbes', 'pirates of the caribbean',
+  'james bond', 'jurassic', 'indiana jones', 'matrix', 'hunger games',
+  'twilight', 'mission: impossible', 'mission impossible', 'x-men',
+  'alien', 'terminator', 'john wick', 'transformers', 'shrek',
+  'toy story', 'l\'âge de glace', 'ice age', 'planète des singes',
+  'planet of the apes', 'conjuring', 'mad max', 'die hard', 'saw',
+  'resident evil', 'divergente', 'maze runner', 'le labyrinthe', 'the hobbit',
+  'le hobbit', 'despicable me', 'moi, moche et méchant', 'minions',
+  'le parrain', 'the godfather', 'back to the future', 'retour vers le futur',
+  'dune', 'game of thrones', 'house of the dragon'
+];
+
 /**
- * Detect precise media category: 'movie' | 'series' | 'anime' | 'kdrama'
+ * Detect precise media category: 'movie' | 'series' | 'saga' | 'anime' | 'kdrama'
  */
 export function detectMediaCategory(item) {
+  if (item.category === 'saga' || item.isSaga) return 'saga';
+
+  const hasCollection = !!(item.belongs_to_collection || item.belongsToCollection || item.collectionName || item.belongs_to_collection?.id);
+  const titleLower = (item.title || item.name || item.original_title || item.original_name || '').toLowerCase();
+  
+  const isSagaTitle = SAGA_KEYWORDS.some(kw => titleLower.includes(kw));
+  if (hasCollection || isSagaTitle) {
+    return 'saga';
+  }
+
   if (item.media_type === 'movie' || (!item.media_type && item.title && !item.name)) {
     return 'movie';
   }
