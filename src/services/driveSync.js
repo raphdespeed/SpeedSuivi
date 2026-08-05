@@ -55,23 +55,6 @@ function saveTokenInfo(token, expiresInSeconds) {
 }
 
 /**
- * Direct OAuth2 Implicit Grant Redirect Fallback
- * Bypasses third-party cookie restrictions & popup blockers on PC/Mobile.
- */
-export function redirectToGoogleOAuth() {
-  const redirectUri = window.location.origin + window.location.pathname;
-  const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
-    `client_id=${encodeURIComponent(CLIENT_ID)}` +
-    `&redirect_uri=${encodeURIComponent(redirectUri)}` +
-    `&response_type=token` +
-    `&scope=${encodeURIComponent(SCOPE + ' https://www.googleapis.com/oauth2/v3/userinfo')}` +
-    `&include_granted_scopes=true` +
-    `&prompt=consent`;
-
-  window.location.href = authUrl;
-}
-
-/**
  * Active polling / promise helper to guarantee Google Identity Services (GIS) script loading.
  */
 function ensureGISLoaded(timeoutMs = 3000) {
@@ -131,24 +114,19 @@ function setupTokenClient(onDataReceived, onStatusChange) {
       client_id: CLIENT_ID,
       scope: SCOPE,
       error_callback: (err) => {
-        console.warn('OAuth GIS Error Callback (3rd party cookies/popup blocked), launching direct redirect fallback:', err);
-        // Automatic fallback to direct redirect if popup or third-party cookies are blocked
-        redirectToGoogleOAuth();
+        // Log background GIS SDK notices silently without blocking UI or alerting
+        console.warn('GIS SDK background notice:', err);
       },
       callback: async (response) => {
         if (response.error) {
           console.warn('OAuth GIS Response error:', response.error);
-          if (response.error === 'popup_blocked_by_browser' || response.error === 'popup_closed') {
-            console.warn('Popup blocked/closed, redirecting via standard OAuth...');
-            redirectToGoogleOAuth();
-            return;
-          }
-
-          driveState.error = response.error;
           driveState.isSyncing = false;
           driveState.isConnected = false;
-          localStorage.removeItem(TOKEN_INFO_KEY);
           if (onStatusChange) onStatusChange(driveState);
+
+          if (response.error !== 'popup_closed_by_user' && response.error !== 'popup_closed') {
+            alert(`Connexion Google interrompue (${response.error}). Veuillez réessayer.`);
+          }
           return;
         }
 
@@ -288,35 +266,13 @@ async function fetchWithDriveAuth(url, options = {}) {
 }
 
 /**
- * Initialize Google Token Client & Handle OAuth Redirects
+ * Initialize Google Token Client
  */
 export function initDriveSync(onStatusChange, onDataReceived) {
   if (onStatusChange) statusChangeCallback = onStatusChange;
 
   try {
-    // 1. Check if returning from Direct OAuth Redirect (#access_token=...)
-    const hash = window.location.hash;
-    if (hash && hash.includes('access_token=')) {
-      try {
-        const hashParams = new URLSearchParams(hash.substring(1));
-        const token = hashParams.get('access_token');
-        const expiresIn = parseInt(hashParams.get('expires_in') || '3600', 10);
-
-        if (token) {
-          saveTokenInfo(token, expiresIn);
-          driveState.isConnected = true;
-
-          // Clean hash from URL without page reload
-          if (window.history && window.history.replaceState) {
-            window.history.replaceState(null, '', window.location.pathname + window.location.search);
-          }
-        }
-      } catch (e) {
-        console.error('Error parsing OAuth redirect hash:', e);
-      }
-    }
-
-    // 2. Restore cached user profile from localStorage
+    // 1. Restore cached user profile from localStorage
     const cachedUser = localStorage.getItem(USER_KEY);
     if (cachedUser) {
       try {
@@ -324,7 +280,7 @@ export function initDriveSync(onStatusChange, onDataReceived) {
       } catch (e) {}
     }
 
-    // 3. Restore cached token if STILL VALID (expiresAt > Date.now())
+    // 2. Restore cached token if STILL VALID (expiresAt > Date.now())
     const cachedTokenInfoStr = localStorage.getItem(TOKEN_INFO_KEY);
 
     if (cachedTokenInfoStr) {
@@ -352,12 +308,12 @@ export function initDriveSync(onStatusChange, onDataReceived) {
         driveState.isConnected = false;
         if (onStatusChange) onStatusChange(driveState);
       }
-    } else if (!driveState.isConnected) {
+    } else {
       driveState.isConnected = false;
       if (onStatusChange) onStatusChange(driveState);
     }
 
-    // 4. Pre-initialize TokenClient eagerly for popup attempts
+    // 3. Pre-initialize TokenClient eagerly in background
     ensureGISLoaded(3000).then((isLoaded) => {
       if (isLoaded) {
         setupTokenClient(onDataReceived, onStatusChange);
@@ -371,20 +327,22 @@ export function initDriveSync(onStatusChange, onDataReceived) {
 }
 
 /**
- * Trigger OAuth Login Flow
- * Tries popup mode first, and immediately redirects if popups/3rd-party cookies are blocked.
+ * Trigger OAuth Login Flow via Google Identity Services Popup
  */
 export function loginGoogleDrive(onDataReceived, onStatusChange) {
   try {
+    if (!tokenClient && window.google?.accounts?.oauth2) {
+      setupTokenClient(onDataReceived, onStatusChange || statusChangeCallback);
+    }
+
     if (tokenClient) {
       tokenClient.requestAccessToken({ prompt: 'consent' });
     } else {
-      // Fallback directly to OAuth redirect flow if GIS is delayed or blocked
-      redirectToGoogleOAuth();
+      alert("Le service Google Identity est en cours de chargement. Veuillez réessayer dans quelques secondes.");
     }
   } catch (e) {
-    console.error('Error triggering Google Drive login, redirecting:', e);
-    redirectToGoogleOAuth();
+    console.error('Error triggering Google Drive login:', e);
+    alert("Impossible d'ouvrir la fenêtre de connexion Google. Veuillez autoriser les fenêtres surgissantes (pop-ups) pour ce site.");
   }
 }
 
