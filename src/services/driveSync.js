@@ -29,14 +29,6 @@ export const driveState = {
 };
 
 /**
- * Detect mobile environment (phones & tablets)
- */
-function isMobileDevice() {
-  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
-    || (navigator.maxTouchPoints && navigator.maxTouchPoints > 2 && /MacIntel/.test(navigator.platform));
-}
-
-/**
  * Save active token info into localStorage ({ accessToken, expiresAt })
  */
 function saveTokenInfo(token, expiresInSeconds) {
@@ -165,53 +157,34 @@ function setupTokenClient(onDataReceived, onStatusChange) {
 }
 
 /**
- * Proactively check if token is valid or expiring within 5 minutes.
+ * Proactively check if token is valid (expiresAt > Date.now()).
+ * NO silent requestAccessToken({ prompt: '' }) calls to avoid gsiw stuck spinners in Brave/Mobile.
  */
 async function ensureValidToken() {
   if (!accessToken) return false;
 
   const now = Date.now();
-  const fiveMinutesMs = 5 * 60 * 1000;
-
-  if (tokenExpiryTime && (tokenExpiryTime - now > fiveMinutesMs)) {
+  if (tokenExpiryTime && tokenExpiryTime > now) {
     return true;
   }
 
-  // On mobile devices, never trigger silent requestAccessToken background popups
-  if (isMobileDevice()) {
-    if (tokenExpiryTime && tokenExpiryTime > now) {
-      return true;
-    }
-    return false;
-  }
-
-  if (tokenClient) {
-    return new Promise((resolve) => {
-      try {
-        tokenClient.requestAccessToken({ prompt: '' });
-        setTimeout(() => {
-          if (accessToken && (tokenExpiryTime - Date.now() > 0)) {
-            resolve(true);
-          } else {
-            resolve(false);
-          }
-        }, 2000);
-      } catch (e) {
-        resolve(false);
-      }
-    });
-  }
+  // Token expired -> Reset session state cleanly without silent background popups
+  accessToken = null;
+  tokenExpiryTime = 0;
+  localStorage.removeItem(TOKEN_INFO_KEY);
+  driveState.isConnected = false;
+  if (statusChangeCallback) statusChangeCallback(driveState);
 
   return false;
 }
 
 /**
- * Central HTTP fetch wrapper for Drive API requests with 401/403 retry handling.
+ * Central HTTP fetch wrapper for Drive API requests with clean 401/403 session clearing.
  */
 async function fetchWithDriveAuth(url, options = {}) {
-  await ensureValidToken();
+  const isValid = await ensureValidToken();
 
-  if (!accessToken) {
+  if (!isValid || !accessToken) {
     return null;
   }
 
@@ -221,52 +194,21 @@ async function fetchWithDriveAuth(url, options = {}) {
     return fetch(url, { ...options, headers });
   };
 
-  let response = null;
   try {
-    response = await makeRequest();
+    const response = await makeRequest();
+    if (response && (response.status === 401 || response.status === 403)) {
+      console.warn(`Drive API HTTP ${response.status}: clearing session.`);
+      accessToken = null;
+      tokenExpiryTime = 0;
+      localStorage.removeItem(TOKEN_INFO_KEY);
+      driveState.isConnected = false;
+      if (statusChangeCallback) statusChangeCallback(driveState);
+    }
+    return response;
   } catch (err) {
     console.error('Network error calling Drive API:', err);
     return null;
   }
-
-  // Handle 401/403 without creating background popup loops on mobile
-  if (response && (response.status === 401 || response.status === 403)) {
-    if (!isMobileDevice() && tokenClient) {
-      const refreshed = await new Promise((resolve) => {
-        try {
-          tokenClient.requestAccessToken({ prompt: '' });
-          setTimeout(() => {
-            if (accessToken && (tokenExpiryTime - Date.now() > 0)) {
-              resolve(true);
-            } else {
-              resolve(false);
-            }
-          }, 2000);
-        } catch (e) {
-          resolve(false);
-        }
-      });
-
-      if (refreshed) {
-        try {
-          response = await makeRequest();
-        } catch (retryErr) {
-          return null;
-        }
-      }
-    }
-  }
-
-  if (response && (response.status === 401 || response.status === 403)) {
-    accessToken = null;
-    tokenExpiryTime = 0;
-    localStorage.removeItem(TOKEN_INFO_KEY);
-    driveState.isConnected = false;
-    if (statusChangeCallback) statusChangeCallback(driveState);
-    return response;
-  }
-
-  return response;
 }
 
 /**
@@ -332,6 +274,7 @@ export function initDriveSync(onStatusChange, onDataReceived) {
 
 /**
  * Trigger OAuth Login Flow via Google Identity Services Popup
+ * Uses prompt: 'select_account' to open the account chooser directly without gsiw background loops.
  */
 export function loginGoogleDrive(onDataReceived, onStatusChange) {
   try {
@@ -340,9 +283,9 @@ export function loginGoogleDrive(onDataReceived, onStatusChange) {
     }
 
     if (tokenClient) {
-      tokenClient.requestAccessToken({ prompt: 'consent' });
+      tokenClient.requestAccessToken({ prompt: 'select_account' });
     } else {
-      alert("Le service Google Identity est en cours de chargement. Veuillez réessayer dans quelques secondes.");
+      alert("Le service Google Identity est en cours de chargement. Veuillez recharger la page et réessayer.");
     }
   } catch (e) {
     console.error('Error triggering Google Drive login:', e);
