@@ -239,6 +239,24 @@ export function initDriveSync(onStatusChange, onDataReceived) {
           accessToken = token;
           tokenExpiryTime = expiresAt;
           driveState.isConnected = true;
+
+          // Fetch user profile if not cached yet
+          if (!driveState.user) {
+            fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+              headers: { Authorization: `Bearer ${accessToken}` }
+            }).then(res => res.ok ? res.json() : null).then(uData => {
+              if (uData) {
+                driveState.user = {
+                  email: uData.email,
+                  name: uData.name || uData.email,
+                  picture: uData.picture || null
+                };
+                localStorage.setItem(USER_KEY, JSON.stringify(driveState.user));
+                if (onStatusChange) onStatusChange(driveState);
+              }
+            }).catch(() => {});
+          }
+
           if (onStatusChange) onStatusChange(driveState);
 
           // Perform initial sync using valid cached token
