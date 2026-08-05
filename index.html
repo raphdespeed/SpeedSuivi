@@ -436,8 +436,38 @@
           <div class="w-10 h-10 border-4 border-white/10 border-t-netflixRed rounded-full animate-spin"></div>
         </div>
 
-        <div v-else class="space-y-12">
-          <!-- Section 1: Dernières Sorties Films -->
+        <div v-else class="space-y-14">
+          <!-- Section 1: Top Tendances du Moment -->
+          <div class="space-y-4">
+            <h3 class="font-heading font-bold text-lg text-white flex items-center gap-2">
+              <span>🔥</span> <span>Top Tendances du Moment</span>
+            </h3>
+            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 2xl:grid-cols-8 gap-4 md:gap-6">
+              <div 
+                v-for="item in trendingHome" 
+                :key="item.id"
+                @click="openMediaDetail(item)"
+                class="bg-cardBg border border-white/10 rounded-xl overflow-hidden cursor-pointer group hover:-translate-y-1.5 hover:border-white/30 transition-all duration-300 shadow-xl relative flex flex-col"
+              >
+                <div class="relative aspect-[2/3] bg-gray-900 overflow-hidden">
+                  <img :src="item.posterPath" :alt="item.title" @error="handleImgError($event, item.title)" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
+                  <div class="absolute top-2 left-2 flex gap-1">
+                    <span class="text-[10px] font-heading font-bold px-2 py-0.5 rounded bg-netflixRed/90 text-white">🔥 Tendance</span>
+                    <span v-if="item.year" class="text-[10px] font-heading px-1.5 py-0.5 rounded bg-black/60 text-gray-300">{{ item.year }}</span>
+                  </div>
+                </div>
+                <div class="p-3 flex flex-col flex-1">
+                  <h4 class="font-heading font-bold text-sm text-white line-clamp-2 mb-2 leading-snug" :title="item.title">{{ item.title }}</h4>
+                  <div class="mt-auto pt-2 flex gap-1.5">
+                    <button @click.stop="saveItem(item, 'in_progress')" class="flex-1 text-[11px] font-heading font-bold py-1 bg-netflixRed hover:bg-netflixRedHover text-white rounded-lg transition-colors">+ En cours</button>
+                    <button @click.stop="saveItem(item, 'watchlist')" class="flex-1 text-[11px] font-heading font-bold py-1 bg-traktPurple hover:opacity-90 text-white rounded-lg transition-colors">+ À voir</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section 2: Dernières Sorties Films -->
           <div class="space-y-4">
             <h3 class="font-heading font-bold text-lg text-white flex items-center gap-2">
               <span>🎬</span> <span>Dernières Sorties Films</span>
@@ -467,7 +497,7 @@
             </div>
           </div>
 
-          <!-- Section 2: Séries & Nouveautés TV -->
+          <!-- Section 3: Séries & Nouveautés TV -->
           <div class="space-y-4">
             <h3 class="font-heading font-bold text-lg text-white flex items-center gap-2">
               <span>📺</span> <span>Séries & Nouveautés TV</span>
@@ -497,7 +527,7 @@
             </div>
           </div>
 
-          <!-- Section 3: Nouveautés Animés (JP) -->
+          <!-- Section 4: Nouveautés Animés (JP) -->
           <div class="space-y-4">
             <h3 class="font-heading font-bold text-lg text-white flex items-center gap-2">
               <span>🇯🇵</span> <span>Nouveautés Animés Japonais</span>
@@ -527,7 +557,7 @@
             </div>
           </div>
 
-          <!-- Section 4: Nouveaux K-Dramas (KR) -->
+          <!-- Section 5: Nouveaux K-Dramas (KR) -->
           <div class="space-y-4">
             <h3 class="font-heading font-bold text-lg text-white flex items-center gap-2">
               <span>🇰🇷</span> <span>Nouveaux K-Dramas Coréens</span>
@@ -543,6 +573,66 @@
                   <img :src="item.posterPath" :alt="item.title" @error="handleImgError($event, item.title)" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
                   <div class="absolute top-2 left-2 flex gap-1">
                     <span class="text-[10px] font-heading font-bold px-2 py-0.5 rounded bg-pink-600/90 text-white">🇰🇷 K-Drama</span>
+                    <span v-if="item.year" class="text-[10px] font-heading px-1.5 py-0.5 rounded bg-black/60 text-gray-300">{{ item.year }}</span>
+                  </div>
+                </div>
+                <div class="p-3 flex flex-col flex-1">
+                  <h4 class="font-heading font-bold text-sm text-white line-clamp-2 mb-2 leading-snug" :title="item.title">{{ item.title }}</h4>
+                  <div class="mt-auto pt-2 flex gap-1.5">
+                    <button @click.stop="saveItem(item, 'in_progress')" class="flex-1 text-[11px] font-heading font-bold py-1 bg-netflixRed hover:bg-netflixRedHover text-white rounded-lg transition-colors">+ En cours</button>
+                    <button @click.stop="saveItem(item, 'watchlist')" class="flex-1 text-[11px] font-heading font-bold py-1 bg-traktPurple hover:opacity-90 text-white rounded-lg transition-colors">+ À voir</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section 6: Top Films Les Mieux Notés -->
+          <div class="space-y-4">
+            <h3 class="font-heading font-bold text-lg text-white flex items-center gap-2">
+              <span>⭐</span> <span>Top Films Les Mieux Notés</span>
+            </h3>
+            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 2xl:grid-cols-8 gap-4 md:gap-6">
+              <div 
+                v-for="item in topRatedMovies" 
+                :key="item.id"
+                @click="openMediaDetail(item)"
+                class="bg-cardBg border border-white/10 rounded-xl overflow-hidden cursor-pointer group hover:-translate-y-1.5 hover:border-white/30 transition-all duration-300 shadow-xl relative flex flex-col"
+              >
+                <div class="relative aspect-[2/3] bg-gray-900 overflow-hidden">
+                  <img :src="item.posterPath" :alt="item.title" @error="handleImgError($event, item.title)" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
+                  <div class="absolute top-2 left-2 flex gap-1">
+                    <span class="text-[10px] font-heading font-bold px-2 py-0.5 rounded bg-amber-500/90 text-black font-extrabold">⭐ {{ item.voteAverage ? item.voteAverage.toFixed(1) : 'Top' }}</span>
+                    <span v-if="item.year" class="text-[10px] font-heading px-1.5 py-0.5 rounded bg-black/60 text-gray-300">{{ item.year }}</span>
+                  </div>
+                </div>
+                <div class="p-3 flex flex-col flex-1">
+                  <h4 class="font-heading font-bold text-sm text-white line-clamp-2 mb-2 leading-snug" :title="item.title">{{ item.title }}</h4>
+                  <div class="mt-auto pt-2 flex gap-1.5">
+                    <button @click.stop="saveItem(item, 'in_progress')" class="flex-1 text-[11px] font-heading font-bold py-1 bg-netflixRed hover:bg-netflixRedHover text-white rounded-lg transition-colors">+ En cours</button>
+                    <button @click.stop="saveItem(item, 'watchlist')" class="flex-1 text-[11px] font-heading font-bold py-1 bg-traktPurple hover:opacity-90 text-white rounded-lg transition-colors">+ À voir</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section 7: Top Séries Incontournables -->
+          <div class="space-y-4">
+            <h3 class="font-heading font-bold text-lg text-white flex items-center gap-2">
+              <span>👑</span> <span>Top Séries Incontournables</span>
+            </h3>
+            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 2xl:grid-cols-8 gap-4 md:gap-6">
+              <div 
+                v-for="item in topRatedSeries" 
+                :key="item.id"
+                @click="openMediaDetail(item)"
+                class="bg-cardBg border border-white/10 rounded-xl overflow-hidden cursor-pointer group hover:-translate-y-1.5 hover:border-white/30 transition-all duration-300 shadow-xl relative flex flex-col"
+              >
+                <div class="relative aspect-[2/3] bg-gray-900 overflow-hidden">
+                  <img :src="item.posterPath" :alt="item.title" @error="handleImgError($event, item.title)" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
+                  <div class="absolute top-2 left-2 flex gap-1">
+                    <span class="text-[10px] font-heading font-bold px-2 py-0.5 rounded bg-emerald-500/90 text-black font-extrabold">👑 Top</span>
                     <span v-if="item.year" class="text-[10px] font-heading px-1.5 py-0.5 rounded bg-black/60 text-gray-300">{{ item.year }}</span>
                   </div>
                 </div>
@@ -1703,6 +1793,9 @@
         const recentSeries = ref([]);
         const recentAnime = ref([]);
         const recentKdrama = ref([]);
+        const trendingHome = ref([]);
+        const topRatedMovies = ref([]);
+        const topRatedSeries = ref([]);
         const isLoadingHome = ref(false);
 
         const isSearching = ref(false);
@@ -2367,20 +2460,37 @@
             const tvUrl = `${BASE_URL}/discover/tv?language=fr-FR&sort_by=first_air_date.desc&first_air_date.lte=${today}&vote_count.gte=3&page=1`;
             const animeUrl = `${BASE_URL}/discover/tv?with_genres=16&with_origin_country=JP&language=fr-FR&sort_by=first_air_date.desc&first_air_date.lte=${today}&page=1`;
             const kdramaUrl = `${BASE_URL}/discover/tv?with_origin_country=KR&language=fr-FR&sort_by=first_air_date.desc&first_air_date.lte=${today}&page=1`;
+            const trendingUrl = `${BASE_URL}/trending/all/day?language=fr-FR`;
+            const topMovieUrl = `${BASE_URL}/movie/top_rated?language=fr-FR&page=1`;
+            const topTvUrl = `${BASE_URL}/tv/top_rated?language=fr-FR&page=1`;
 
-            const [mRes, tRes, aRes, kRes] = await Promise.all([
+            const [mRes, tRes, aRes, kRes, trRes, topMRes, topTRes] = await Promise.all([
               fetch(movieUrl).then(r => r.ok ? r.json() : { results: [] }).catch(() => ({ results: [] })),
               fetch(tvUrl).then(r => r.ok ? r.json() : { results: [] }).catch(() => ({ results: [] })),
               fetch(animeUrl).then(r => r.ok ? r.json() : { results: [] }).catch(() => ({ results: [] })),
-              fetch(kdramaUrl).then(r => r.ok ? r.json() : { results: [] }).catch(() => ({ results: [] }))
+              fetch(kdramaUrl).then(r => r.ok ? r.json() : { results: [] }).catch(() => ({ results: [] })),
+              fetch(trendingUrl).then(r => r.ok ? r.json() : { results: [] }).catch(() => ({ results: [] })),
+              fetch(topMovieUrl).then(r => r.ok ? r.json() : { results: [] }).catch(() => ({ results: [] })),
+              fetch(topTvUrl).then(r => r.ok ? r.json() : { results: [] }).catch(() => ({ results: [] }))
             ]);
 
-            recentMovies.value = (mRes.results || []).filter(i => i.poster_path).slice(0, 10).map(i => formatItem({ ...i, media_type: 'movie' }));
-            recentSeries.value = (tRes.results || []).filter(i => i.poster_path).slice(0, 10).map(i => formatItem({ ...i, media_type: 'tv' }));
-            recentAnime.value = (aRes.results || []).filter(i => i.poster_path).slice(0, 10).map(i => formatItem({ ...i, media_type: 'tv' }));
-            recentKdrama.value = (kRes.results || []).filter(i => i.poster_path).slice(0, 10).map(i => formatItem({ ...i, media_type: 'tv' }));
+            recentMovies.value = (mRes.results || []).filter(i => i.poster_path).slice(0, 16).map(i => formatItem({ ...i, media_type: 'movie' }));
+            recentSeries.value = (tRes.results || []).filter(i => i.poster_path).slice(0, 16).map(i => formatItem({ ...i, media_type: 'tv' }));
+            recentAnime.value = (aRes.results || []).filter(i => i.poster_path).slice(0, 16).map(i => formatItem({ ...i, media_type: 'tv' }));
+            recentKdrama.value = (kRes.results || []).filter(i => i.poster_path).slice(0, 16).map(i => formatItem({ ...i, media_type: 'tv' }));
+            trendingHome.value = (trRes.results || []).filter(i => i.poster_path).slice(0, 16).map(i => formatItem(i));
+            topRatedMovies.value = (topMRes.results || []).filter(i => i.poster_path).slice(0, 16).map(i => formatItem({ ...i, media_type: 'movie' }));
+            topRatedSeries.value = (topTRes.results || []).filter(i => i.poster_path).slice(0, 16).map(i => formatItem({ ...i, media_type: 'tv' }));
 
-            [...recentMovies.value, ...recentSeries.value, ...recentAnime.value, ...recentKdrama.value].forEach(item => enrichWatchProviders(item));
+            [
+              ...trendingHome.value,
+              ...recentMovies.value, 
+              ...recentSeries.value, 
+              ...recentAnime.value, 
+              ...recentKdrama.value,
+              ...topRatedMovies.value,
+              ...topRatedSeries.value
+            ].forEach(item => enrichWatchProviders(item));
           } catch (e) {
             console.error('Error fetching home releases:', e);
           } finally {
@@ -3045,6 +3155,9 @@
           recentSeries,
           recentAnime,
           recentKdrama,
+          trendingHome,
+          topRatedMovies,
+          topRatedSeries,
           isLoadingHome,
           isSearching,
           isLoadingMore,
