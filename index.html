@@ -1020,17 +1020,8 @@
                 <div v-if="item.mediaType !== 'movie'" class="space-y-1.5 mt-auto pt-1">
                   <div class="flex items-center justify-between text-xs font-semibold">
                     <span class="bg-white/10 text-gray-300 px-1.5 py-0.5 rounded text-[11px]">S{{ item.currentSeason || 1 }}</span>
-                    <span class="text-white font-bold">Ép. {{ item.currentEpisode || 0 }} / {{ item.totalEpisodes || 12 }}</span>
+                    <span class="text-white font-bold">Ép. {{ item.currentEpisode || 0 }}</span>
                   </div>
-
-                  <!-- Progress Bar -->
-                  <div class="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
-                    <div 
-                      class="h-full bg-gradient-to-r from-traktPurple to-netflixRed rounded-full transition-all duration-300"
-                      :style="{ width: getProgressPercent(item) + '%' }"
-                    ></div>
-                  </div>
-                  <div class="text-[10px] text-right font-bold text-gray-400">{{ getProgressPercent(item) }}%</div>
 
                   <!-- UX Priority + / - Buttons -->
                   <div class="flex items-center gap-1.5 pt-1">
@@ -1058,10 +1049,7 @@
 
                 <!-- Movie in progress -->
                 <div v-else class="mt-auto pt-2 space-y-2">
-                  <div class="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
-                    <div class="h-full bg-netflixRed" :style="{ width: getProgressPercent(item) + '%' }"></div>
-                  </div>
-                  <button 
+                  <button
                     @click="changeStatus(item.id, 'completed')"
                     class="w-full text-xs font-heading font-bold py-1.5 rounded-md bg-successGreen/10 hover:bg-successGreen hover:text-black border border-successGreen/30 text-successGreen transition-colors"
                   >
@@ -1093,7 +1081,7 @@
               <template v-else-if="item.status === 'completed'">
                 <div class="mt-auto pt-2">
                   <span class="block w-full text-center text-xs font-heading font-bold py-1 bg-successGreen/10 text-successGreen border border-successGreen/30 rounded-md">
-                    ✓ Visionné ({{ item.totalEpisodes || 1 }} ép.)
+                    ✓ Terminé
                   </span>
                 </div>
               </template>
