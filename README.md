@@ -10,11 +10,14 @@
 
 ## ✨ Fonctionnalités Principales
 
+- **☁️ Synchronisation Cloud Google Drive :** 
+  Retrouvez automatiquement toute votre progression et vos séries suivies entre votre PC et votre smartphone en connectant simplement votre compte Google Drive !
+
 - **⚡ Application Web Standalone (100% Statique) :** 
-  Déployée sous la forme d'un fichier `index.html` autonome. Aucun serveur ou installation requis : elle s'exécute directement dans n'importe quel navigateur !
+  Aucun serveur ni installation requis : elle s'exécute directement dans n'importe quel navigateur sur PC et mobile !
 
 - **🔍 Recherche Globale Tolérante :**
-  Barre de recherche réactive avec système anti-perte de focus (debounce 300ms) pour trouver instantanément n'importe quel film ou série, même avec des fautes de frappe (*ex: "quenn" trouvera "Queen Woo"*).
+  Barre de recherche réactive pour trouver instantanément n'importe quel film ou série, même avec des fautes de frappe (*ex: "quenn" trouvera "Queen Woo"*).
 
 - **📊 Dashboard & Gestion du Visionnage :**
   - 🚀 **En cours :** Suivi prioritaire avec boutons d'incrémentation `+` et `-` de l'épisode vu et barre de progression dynamique en pourcentage (%).
@@ -44,23 +47,22 @@ Vous pouvez utiliser l'application de deux manières très simples :
    Rendez-vous simplement sur [https://raphdespeed.github.io/SpeedSuivi/](https://raphdespeed.github.io/SpeedSuivi/).
 
 2. **Utilisation locale :**
-   Double-cliquez simplement sur le fichier [`index.html`](index.html) pour ouvrir l'application dans n'importe quel navigateur (Chrome, Firefox, Edge, Safari).
+   Double-cliquez simplement sur le fichier [`index.html`](index.html) pour ouvrir l'application dans n'importe quel navigateur (Chrome, Firefox, Edge, Safari, Brave).
 
 ---
 
-## 💾 Gestion des Données (Import / Export JSON)
+## ☁️ Synchronisation & Sauvegarde des Données
 
-SpeedSuivi sauvegarde automatiquement l'intégralité de vos séries, épisodes et statuts directement dans le stockage local de votre navigateur (`localStorage`).
+SpeedSuivi vous permet de sauvegarder et de synchroniser gratuitement toute votre liste de visionnage de manière très simple :
 
-### 📥 Exporter ses données
-1. Cliquez sur le bouton **📥 Exporter JSON** situé en haut à droite dans le header.
-2. Un fichier horodaté du type `speedsuivi_backup_YYYY-MM-DD.json` sera immédiatement téléchargé sur votre appareil.
-3. Ce fichier contient une sauvegarde complète et lisible de l'ensemble de votre collection.
+### ☁️ Synchronisation Cloud Google Drive (Recommandé)
+- **Connexion en un clic :** Cliquez sur le bouton **"Synchro Google Drive"** en haut de l'écran et connectez-vous avec votre compte Google.
+- **Synchronisation entre vos appareils :** Vos séries, films et épisodes vus sont automatiquement sauvegardés sur votre espace Google Drive. Retrouvez instantanément votre progression que vous soyez sur votre ordinateur ou sur votre smartphone !
+- **Confidentialité & Sécurité :** L'application crée uniquement son propre fichier de suivi. Elle **n'a accès à aucun autre fichier ou document** présent sur votre Google Drive.
 
-### 📤 Importer une sauvegarde
-1. Cliquez sur le bouton **📤 Importer JSON** dans le header.
-2. Sélectionnez un fichier `.json` de sauvegarde SpeedSuivi sur votre machine.
-3. Vos séries, films et avancements d'épisodes seront instantanément restaurés et synchronisés dans l'application !
+### 💾 Sauvegarde & Restauration Manuelle (Export / Import JSON)
+- **Exporter :** Cliquez sur **"Exporter JSON"** pour télécharger une sauvegarde complète de votre collection sur votre appareil.
+- **Importer :** Cliquez sur **"Importer JSON"** et sélectionnez votre fichier de sauvegarde pour restaurer instantanément l'intégralité de vos séries et films.
 
 ---
 
@@ -69,6 +71,7 @@ SpeedSuivi sauvegarde automatiquement l'intégralité de vos séries, épisodes 
 - **HTML5** (Structure sémantique)
 - **CSS3 & Tailwind CSS (CDN)** (Design moderne dark mode et effets de verre poli)
 - **JavaScript & Vue 3 (CDN Standalone)** (Réactivité dynamique sans build step)
+- **Google Identity Services (GIS)** (Synchronisation Cloud sécurisée)
 
 ---
 
