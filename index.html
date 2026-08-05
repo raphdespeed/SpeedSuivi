@@ -1168,13 +1168,15 @@
       <!-- Fixed Background Hero Backdrop Image (Full-Width Real 85vh fixed layer) -->
       <div 
         v-if="selectedMedia.backdropPath"
-        class="fixed top-0 left-1/2 -translate-x-1/2 w-screen h-[85vh] z-0 pointer-events-none overflow-hidden"
+        @click="activeLightboxImage = selectedMedia.backdropPath"
+        class="fixed top-0 left-1/2 -translate-x-1/2 w-screen h-[85vh] z-0 pointer-events-auto cursor-pointer overflow-hidden group"
+        title="Cliquez pour agrandir la photo de couverture en plein écran"
         style="mask-image: linear-gradient(to bottom, black 65%, transparent 100%); -webkit-mask-image: linear-gradient(to bottom, black 65%, transparent 100%);"
       >
         <img 
           :src="selectedMedia.backdropPath" 
           :alt="selectedMedia.title" 
-          class="w-full h-full object-cover object-top"
+          class="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-700"
         />
       </div>
 
@@ -1182,17 +1184,17 @@
       <div class="sticky top-[72px] left-4 md:top-[72px] md:left-8 z-50 px-4 md:px-8 flex items-center justify-between pointer-events-none">
         <button 
           @click="closeDetailView"
-          class="pointer-events-auto inline-flex items-center gap-2 bg-black/80 hover:bg-netflixRed text-white text-xs md:text-sm font-heading font-bold px-4 py-2.5 rounded-full border border-white/20 shadow-2xl backdrop-blur-md transition-all active:scale-95 group"
+          class="pointer-events-auto inline-flex items-center gap-2 bg-black/80 hover:bg-netflixRed text-white text-xs md:text-sm font-heading font-bold px-4 py-2.5 rounded-full border border-white/20 shadow-2xl backdrop-blur-md transition-all active:scale-95 group cursor-pointer"
         >
           <span class="transform group-hover:-translate-x-1 transition-transform">←</span>
           <span>Retour à la navigation</span>
         </button>
 
         <button 
-          v-if="selectedMedia.backdropPath"
-          @click="activeLightboxImage = selectedMedia.backdropPath"
-          class="pointer-events-auto inline-flex items-center gap-2 bg-black/80 hover:bg-white/20 text-white text-xs md:text-sm font-heading font-bold px-4 py-2.5 rounded-full border border-white/20 shadow-2xl backdrop-blur-md transition-all active:scale-95"
-          title="Voir la photo de couverture en plein écran"
+          v-if="selectedMedia.backdropPath || selectedMedia.posterPath"
+          @click="activeLightboxImage = selectedMedia.backdropPath || selectedMedia.posterPath"
+          class="pointer-events-auto inline-flex items-center gap-2 bg-black/80 hover:bg-white/20 text-white text-xs md:text-sm font-heading font-bold px-4 py-2.5 rounded-full border border-white/20 shadow-2xl backdrop-blur-md transition-all active:scale-95 cursor-pointer"
+          title="Voir l'image en plein écran"
         >
           <span>👁️</span>
           <span class="hidden sm:inline">Voir l'image</span>
@@ -1204,12 +1206,24 @@
         
         <!-- Header Card: Poster + Title + Badges -->
         <div class="flex flex-col md:flex-row gap-6 md:gap-8 items-end bg-black/60 backdrop-blur-xl p-6 md:p-8 rounded-3xl border border-white/10 shadow-2xl">
-          <img 
-            :src="selectedMedia.posterPath" 
-            :alt="selectedMedia.title" 
-            @error="handleImgError($event, selectedMedia.title)"
-            class="w-36 md:w-52 aspect-[2/3] object-cover rounded-2xl border-4 border-white/20 shadow-2xl shrink-0 -mt-16 md:-mt-24" 
-          />
+          <!-- Clickable Poster Container -->
+          <div 
+            @click="activeLightboxImage = selectedMedia.posterPath"
+            class="relative group cursor-pointer shrink-0 -mt-16 md:-mt-24 overflow-hidden rounded-2xl border-4 border-white/20 shadow-2xl transition-transform duration-300 hover:scale-105"
+            title="Cliquez pour agrandir l'affiche en plein écran"
+          >
+            <img 
+              :src="selectedMedia.posterPath" 
+              :alt="selectedMedia.title" 
+              @error="handleImgError($event, selectedMedia.title)"
+              class="w-36 md:w-52 aspect-[2/3] object-cover" 
+            />
+            <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+              <span class="bg-black/80 backdrop-blur-md text-white text-xs font-heading font-bold px-3 py-1.5 rounded-full border border-white/20 shadow-xl flex items-center gap-1.5">
+                <span>🔍</span> Agrandir
+              </span>
+            </div>
+          </div>
           <div class="space-y-3 flex-1 min-w-0">
             <div class="flex flex-wrap gap-2 items-center">
               <span :class="['text-xs font-heading font-bold px-3 py-1 rounded-full shadow-lg', selectedMedia.category === 'kdrama' ? 'bg-pink-600 text-white' : selectedMedia.category === 'anime' ? 'bg-purple-600 text-white' : 'bg-netflixRed text-white']">
@@ -1698,22 +1712,42 @@
 
     </div>
 
-    <!-- Lightbox Modal for Photo Gallery -->
+    <!-- Lightbox Modal for Photo Gallery & Cover/Poster Inspection -->
     <div 
       v-if="activeLightboxImage" 
       @click="activeLightboxImage = null"
-      class="fixed inset-0 z-[300] bg-black/95 flex items-center justify-center p-4 md:p-8 animate-fadeIn"
+      class="fixed inset-0 z-[300] bg-black/95 flex flex-col items-center justify-center p-4 md:p-8 animate-fadeIn"
     >
       <button 
         @click="activeLightboxImage = null"
-        class="absolute top-6 right-6 z-10 w-12 h-12 rounded-full bg-black/80 hover:bg-netflixRed text-white text-2xl flex items-center justify-center transition-colors border border-white/20 shadow-2xl"
+        class="absolute top-6 right-6 z-10 w-12 h-12 rounded-full bg-black/80 hover:bg-netflixRed text-white text-2xl flex items-center justify-center transition-colors border border-white/20 shadow-2xl cursor-pointer"
+        title="Fermer (Échap)"
       >&times;</button>
+      
       <img 
         :src="activeLightboxImage" 
         alt="Photo HD agrandie" 
-        class="max-w-full max-h-[90vh] object-contain rounded-xl shadow-2xl border border-white/10" 
+        class="max-w-full max-h-[82vh] object-contain rounded-xl shadow-2xl border border-white/10" 
         @click.stop
       />
+
+      <!-- Quick Switcher between Backdrop & Poster when inspecting media -->
+      <div v-if="selectedMedia && currentRoute === 'media' && (selectedMedia.backdropPath || selectedMedia.posterPath)" @click.stop class="mt-4 flex gap-3 z-10">
+        <button 
+          v-if="selectedMedia.backdropPath"
+          @click="activeLightboxImage = selectedMedia.backdropPath"
+          :class="['px-4 py-1.5 rounded-full text-xs font-heading font-bold transition-all border cursor-pointer', activeLightboxImage === selectedMedia.backdropPath ? 'bg-netflixRed text-white border-netflixRed shadow-lg' : 'bg-white/10 hover:bg-white/20 text-gray-300 border-white/20']"
+        >
+          🖼️ Couverture
+        </button>
+        <button 
+          v-if="selectedMedia.posterPath"
+          @click="activeLightboxImage = selectedMedia.posterPath"
+          :class="['px-4 py-1.5 rounded-full text-xs font-heading font-bold transition-all border cursor-pointer', activeLightboxImage === selectedMedia.posterPath ? 'bg-netflixRed text-white border-netflixRed shadow-lg' : 'bg-white/10 hover:bg-white/20 text-gray-300 border-white/20']"
+        >
+          🎬 Affiche
+        </button>
+      </div>
     </div>
 
     <!-- Floating Back to Top Button -->
