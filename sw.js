@@ -1,4 +1,4 @@
-const CACHE_NAME = 'speedsuivi-v1.4.9-redirect';
+const CACHE_NAME = 'speedsuivi-v1.4.9';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',

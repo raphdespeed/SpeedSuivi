@@ -48,20 +48,19 @@ Vous pouvez utiliser l'application de deux manières très simples :
 
 ---
 
-## 💾 Gestion & Sauvegarde des Données
+## 💾 Gestion des Données (Import / Export JSON)
 
-SpeedSuivi repose sur une architecture **Zero-Backend** : aucune donnée n'est hébergée ou transmise à un serveur tiers. Vous conservez la propriété et le contrôle absolu de vos informations.
+SpeedSuivi sauvegarde automatiquement l'intégralité de vos séries, épisodes et statuts directement dans le stockage local de votre navigateur (`localStorage`).
 
-Deux modes d'utilisation sont proposés, au choix de l'utilisateur :
+### 📥 Exporter ses données
+1. Cliquez sur le bouton **📥 Exporter JSON** situé en haut à droite dans le header.
+2. Un fichier horodaté du type `speedsuivi_backup_YYYY-MM-DD.json` sera immédiatement téléchargé sur votre appareil.
+3. Ce fichier contient une sauvegarde complète et lisible de l'ensemble de votre collection.
 
-### 1. Synchronisation Cloud (Google Drive) ☁️
-* **Sauvegarde automatique :** Vos données sont synchronisées en arrière-plan dans votre espace Google Drive personnel.
-* **Isolation et confidentialité :** L'application utilise le périmètre applicatif masqué `appDataFolder`. SpeedSuivi accède uniquement à son propre fichier de suivi et **n'a aucun accès au reste de votre Drive (documents, photos, etc.)**.
-* **Usage :** Idéal pour retrouver automatiquement votre progression entre votre PC et votre smartphone.
-
-### 2. Mode Local & Export JSON 📁
-* **100 % autonome :** L'application fonctionne intégralement en local dans le navigateur (stockage `localStorage` + PWA hors-ligne).
-* **Import / Export manuel :** Vous pouvez exporter à tout moment l'ensemble de votre base de données au format `.json` pour conserver une sauvegarde physique ou la transférer manuellement sur un autre appareil.
+### 📤 Importer une sauvegarde
+1. Cliquez sur le bouton **📤 Importer JSON** dans le header.
+2. Sélectionnez un fichier `.json` de sauvegarde SpeedSuivi sur votre machine.
+3. Vos séries, films et avancements d'épisodes seront instantanément restaurés et synchronisés dans l'application !
 
 ---
 
