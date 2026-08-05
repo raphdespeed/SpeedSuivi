@@ -8,7 +8,7 @@ const CLIENT_ID = (typeof import.meta !== 'undefined' && import.meta.env && impo
   ? import.meta.env.VITE_GOOGLE_CLIENT_ID
   : '603945258667-0a9970mtho016qrg3tpv5vqcgupsaqk3.apps.googleusercontent.com';
 
-const SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
+const SCOPE = 'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile';
 const FILE_NAME = 'speedsuivi_data.json';
 const TOKEN_INFO_KEY = 'gdrive_token_info';
 const USER_KEY = 'speedsuivi_gdrive_user';
@@ -114,7 +114,6 @@ function setupTokenClient(onDataReceived, onStatusChange) {
       client_id: CLIENT_ID,
       scope: SCOPE,
       error_callback: (err) => {
-        // Log background GIS SDK notices silently without blocking UI or alerting
         console.warn('GIS SDK background notice:', err);
       },
       callback: async (response) => {
@@ -135,8 +134,11 @@ function setupTokenClient(onDataReceived, onStatusChange) {
         driveState.isConnected = true;
         driveState.error = null;
 
+        // Direct fetch for user info without routing through fetchWithDriveAuth retry loop
         try {
-          const userRes = await fetchWithDriveAuth('https://www.googleapis.com/oauth2/v3/userinfo');
+          const userRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+            headers: { Authorization: `Bearer ${response.access_token}` }
+          });
           if (userRes && userRes.ok) {
             const uData = await userRes.json();
             driveState.user = {
@@ -147,7 +149,7 @@ function setupTokenClient(onDataReceived, onStatusChange) {
             localStorage.setItem(USER_KEY, JSON.stringify(driveState.user));
           }
         } catch (ue) {
-          console.warn('UserInfo fetch warning:', ue);
+          console.warn('UserInfo fetch warning (non-fatal):', ue);
         }
 
         if (onStatusChange) onStatusChange(driveState);
@@ -175,6 +177,7 @@ async function ensureValidToken() {
     return true;
   }
 
+  // On mobile devices, never trigger silent requestAccessToken background popups
   if (isMobileDevice()) {
     if (tokenExpiryTime && tokenExpiryTime > now) {
       return true;
@@ -226,8 +229,9 @@ async function fetchWithDriveAuth(url, options = {}) {
     return null;
   }
 
+  // Handle 401/403 without creating background popup loops on mobile
   if (response && (response.status === 401 || response.status === 403)) {
-    if (tokenClient) {
+    if (!isMobileDevice() && tokenClient) {
       const refreshed = await new Promise((resolve) => {
         try {
           tokenClient.requestAccessToken({ prompt: '' });
