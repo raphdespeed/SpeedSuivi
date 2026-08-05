@@ -2,6 +2,13 @@
  * Google Drive AppData Zero-Backend Synchronization Service for SpeedSuivi
  * Client ID: 603945258667-0a9970mtho016qrg3tpv5vqcgupsaqk3.apps.googleusercontent.com
  * Scope: https://www.googleapis.com/auth/drive.appdata
+ *
+ * AUTH STRATEGY (v1.4.9): OAuth2 Implicit Redirect Flow.
+ * We no longer use Google Identity Services (`initTokenClient` / popups / iFrames).
+ * Popups are blocked by strict third-party-cookie browsers (Brave, hardened Chrome/Edge)
+ * and by mobile browsers that refuse non-synchronous window.open() calls.
+ * A full-page redirect (`window.location.href = authUrl`) has none of those restrictions:
+ * it works identically on mobile and desktop, with or without third-party cookies.
  */
 
 const CLIENT_ID = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_GOOGLE_CLIENT_ID)
@@ -9,11 +16,13 @@ const CLIENT_ID = (typeof import.meta !== 'undefined' && import.meta.env && impo
   : '603945258667-0a9970mtho016qrg3tpv5vqcgupsaqk3.apps.googleusercontent.com';
 
 const SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
+const AUTH_ENDPOINT = 'https://accounts.google.com/o/oauth2/v2/auth';
+const REVOKE_ENDPOINT = 'https://oauth2.googleapis.com/revoke';
 const FILE_NAME = 'speedsuivi_data.json';
 const TOKEN_INFO_KEY = 'gdrive_token_info';
 const USER_KEY = 'speedsuivi_gdrive_user';
+const OAUTH_STATE_KEY = 'gdrive_oauth_state';
 
-let tokenClient = null;
 let accessToken = null;
 let tokenExpiryTime = 0;
 let driveFileId = null;
@@ -29,11 +38,45 @@ export const driveState = {
 };
 
 /**
- * Detect mobile environment (phones & tablets) to avoid silent token refresh popups.
+ * Compute the redirect_uri dynamically from the current page location.
+ * MUST exactly match (including trailing slash) an "Authorized redirect URI"
+ * configured on the Google Cloud OAuth Client, e.g.:
+ *   https://raphdespeed.github.io/SpeedSuivi/
+ *   http://localhost:5173/ (for local dev)
  */
-function isMobileDevice() {
-  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
-    || (navigator.maxTouchPoints && navigator.maxTouchPoints > 2 && /MacIntel/.test(navigator.platform));
+function getRedirectUri() {
+  return window.location.origin + window.location.pathname;
+}
+
+/**
+ * Generate a short random string used as CSRF protection (OAuth `state` param).
+ */
+function generateState() {
+  return Math.random().toString(36).slice(2) + Date.now().toString(36);
+}
+
+/**
+ * Build the full Google OAuth2 implicit-flow authorization URL.
+ */
+function buildAuthUrl() {
+  const state = generateState();
+  try {
+    sessionStorage.setItem(OAUTH_STATE_KEY, state);
+  } catch (e) {
+    console.warn('Unable to persist OAuth state in sessionStorage:', e);
+  }
+
+  const params = new URLSearchParams({
+    client_id: CLIENT_ID,
+    redirect_uri: getRedirectUri(),
+    response_type: 'token',
+    scope: SCOPE,
+    include_granted_scopes: 'true',
+    prompt: 'consent',
+    state
+  });
+
+  return `${AUTH_ENDPOINT}?${params.toString()}`;
 }
 
 /**
@@ -55,190 +98,92 @@ function saveTokenInfo(token, expiresInSeconds) {
 }
 
 /**
- * Active polling / promise helper to guarantee Google Identity Services (GIS) script loading.
- * Dynamically reloads script if missing after 3 seconds.
+ * Parse the URL hash fragment for an OAuth2 implicit-flow response
+ * (`#access_token=...&expires_in=...&state=...` or `#error=...&state=...`).
+ * Cleans the hash from the address bar immediately via history.replaceState
+ * so the token never lingers in the URL, browser history, or gets re-parsed
+ * on refresh.
+ * Returns: { accessToken, expiresIn } | { error } | null (nothing to parse)
  */
-function ensureGISLoaded(timeoutMs = 3000) {
-  return new Promise((resolve) => {
-    if (window.google && window.google.accounts && window.google.accounts.oauth2) {
-      resolve(true);
-      return;
-    }
+function consumeAuthRedirectHash() {
+  if (!window.location.hash || window.location.hash.length < 2) return null;
 
-    let elapsed = 0;
-    const interval = 100;
-    const checkTimer = setInterval(() => {
-      elapsed += interval;
-      if (window.google && window.google.accounts && window.google.accounts.oauth2) {
-        clearInterval(checkTimer);
-        resolve(true);
-        return;
-      }
+  const hashParams = new URLSearchParams(window.location.hash.substring(1));
+  const hasOAuthPayload = hashParams.has('access_token') || hashParams.has('error');
+  if (!hasOAuthPayload) return null;
 
-      if (elapsed >= timeoutMs) {
-        clearInterval(checkTimer);
-        console.warn('GIS SDK not ready after 3s, dynamically injecting script...');
+  const cleanUrl = window.location.pathname + window.location.search;
+  history.replaceState(null, '', cleanUrl);
 
-        const scriptId = 'google-gsi-script-dynamic';
-        let script = document.getElementById(scriptId);
-        if (!script) {
-          script = document.createElement('script');
-          script.id = scriptId;
-          script.src = 'https://accounts.google.com/gsi/client';
-          script.async = true;
-          script.defer = true;
-          document.head.appendChild(script);
-        }
-
-        let retryElapsed = 0;
-        const retryTimer = setInterval(() => {
-          retryElapsed += interval;
-          if (window.google && window.google.accounts && window.google.accounts.oauth2) {
-            clearInterval(retryTimer);
-            resolve(true);
-          } else if (retryElapsed >= 3000) {
-            clearInterval(retryTimer);
-            console.error('Failed to load Google Identity Services SDK.');
-            resolve(false);
-          }
-        }, interval);
-      }
-    }, interval);
-  });
-}
-
-/**
- * Helper to initialize GIS Token Client
- */
-function setupTokenClient(onDataReceived, onStatusChange) {
-  if (tokenClient || !window.google || !window.google.accounts || !window.google.accounts.oauth2) return;
-
+  let expectedState = null;
   try {
-    tokenClient = window.google.accounts.oauth2.initTokenClient({
-      client_id: CLIENT_ID,
-      scope: SCOPE,
-      error_callback: (err) => {
-        console.warn('OAuth GIS Error Callback:', err);
-        const errMsg = err?.message || err?.error || 'popup_blocked';
-        driveState.error = errMsg;
-        driveState.isSyncing = false;
-        driveState.isConnected = false;
-        if (onStatusChange) onStatusChange(driveState);
-        alert('Connexion bloquée : autorisez les cookies tiers et les pop-ups pour accounts.google.com dans votre navigateur.');
-      },
-      callback: async (response) => {
-        if (response.error) {
-          console.warn('OAuth GIS Response error:', response.error);
-          let userNotice = `Erreur de connexion : ${response.error}`;
-          if (response.error === 'popup_closed' || response.error === 'popup_closed_by_user') {
-            userNotice = 'La fenêtre de connexion Google a été fermée avant la validation.';
-          } else if (response.error === 'access_denied') {
-            userNotice = "L'accès à Google Drive a été refusé par l'utilisateur.";
-          } else if (response.error === 'popup_blocked_by_browser' || (typeof response.error === 'string' && response.error.includes('cookie'))) {
-            userNotice = 'Connexion bloquée : autorisez les cookies tiers et les pop-ups pour accounts.google.com dans votre navigateur.';
-          }
-          driveState.error = response.error;
-          driveState.isSyncing = false;
-          driveState.isConnected = false;
-          localStorage.removeItem(TOKEN_INFO_KEY);
-          if (onStatusChange) onStatusChange(driveState);
-          alert(userNotice);
-          return;
-        }
+    expectedState = sessionStorage.getItem(OAUTH_STATE_KEY);
+    sessionStorage.removeItem(OAUTH_STATE_KEY);
+  } catch (e) {}
 
-        // Save fresh token to localStorage ({ accessToken, expiresAt })
-        saveTokenInfo(response.access_token, response.expires_in);
-
-        driveState.isConnected = true;
-        driveState.error = null;
-
-        // Fetch user profile using Google userInfo API
-        try {
-          const userRes = await fetchWithDriveAuth('https://www.googleapis.com/oauth2/v3/userinfo');
-          if (userRes && userRes.ok) {
-            const uData = await userRes.json();
-            driveState.user = {
-              email: uData.email,
-              name: uData.name || uData.email,
-              picture: uData.picture || null
-            };
-            localStorage.setItem(USER_KEY, JSON.stringify(driveState.user));
-          }
-        } catch (ue) {
-          console.warn('UserInfo fetch warning:', ue);
-        }
-
-        if (onStatusChange) onStatusChange(driveState);
-
-        // Perform sync with Google Drive appDataFolder
-        if (onDataReceived) {
-          await syncWithDrive(onDataReceived, onStatusChange);
-        }
-      }
-    });
-  } catch (e) {
-    console.error('Error setting up TokenClient:', e);
+  const returnedState = hashParams.get('state');
+  if (expectedState && returnedState && returnedState !== expectedState) {
+    console.warn('OAuth state mismatch: discarding response for safety.');
+    return { error: 'state_mismatch' };
   }
+
+  const error = hashParams.get('error');
+  if (error) {
+    return { error };
+  }
+
+  const accessTokenValue = hashParams.get('access_token');
+  const expiresIn = parseInt(hashParams.get('expires_in'), 10) || 3600;
+  if (accessTokenValue) {
+    return { accessToken: accessTokenValue, expiresIn };
+  }
+
+  return null;
 }
 
 /**
- * Proactively check if token is valid or expiring within 5 minutes.
- * On MOBILE: never attempt silent requestAccessToken (causes popup/spinner loops).
- * On DESKTOP: attempt silent refresh only during active API calls.
+ * Translate an OAuth error code into a user-facing French message.
  */
-async function ensureValidToken() {
-  if (!accessToken) return false;
-
-  const now = Date.now();
-  const fiveMinutesMs = 5 * 60 * 1000;
-
-  // Token is valid with >5 minutes remaining
-  if (tokenExpiryTime && (tokenExpiryTime - now > fiveMinutesMs)) {
-    return true;
+function describeOAuthError(errorCode) {
+  switch (errorCode) {
+    case 'access_denied':
+      return "L'accès à Google Drive a été refusé.";
+    case 'state_mismatch':
+      return 'Connexion Google Drive annulée pour des raisons de sécurité. Merci de réessayer.';
+    case 'invalid_request':
+    case 'invalid_client':
+    case 'redirect_uri_mismatch':
+      return "Configuration Google OAuth invalide (redirect_uri). Contactez le développeur de l'application.";
+    default:
+      return `Erreur de connexion Google Drive : ${errorCode}`;
   }
-
-  // On mobile, NEVER attempt silent refresh — it triggers popup/spinner
-  if (isMobileDevice()) {
-    console.warn('Mobile detected: skipping silent token refresh. Token may be expiring.');
-    // If token still technically valid (just under 5 min), allow the request
-    if (tokenExpiryTime && tokenExpiryTime > now) {
-      return true;
-    }
-    return false;
-  }
-
-  // Desktop only: Token expiring soon -> Attempt silent refresh
-  if (tokenClient) {
-    return new Promise((resolve) => {
-      try {
-        tokenClient.requestAccessToken({ prompt: '' });
-        setTimeout(() => {
-          if (accessToken && (tokenExpiryTime - Date.now() > 0)) {
-            resolve(true);
-          } else {
-            console.warn('Silent token refresh did not yield a valid token in time.');
-            resolve(false);
-          }
-        }, 2000);
-      } catch (e) {
-        console.error('Silent token request error:', e);
-        resolve(false);
-      }
-    });
-  }
-
-  return false;
 }
 
 /**
- * Central HTTP fetch wrapper for Drive API requests with 401/403 retry handling.
- * Does NOT disconnect immediately on 401/403; attempts ONE silent token refresh first.
+ * Proactively check if the cached token is still valid.
+ * The implicit flow never returns a refresh token, so there is no silent
+ * renewal possible: once expired, the user must click "Se connecter" again
+ * (which redirects — no popup involved).
+ */
+function isTokenValid() {
+  return !!(accessToken && tokenExpiryTime && tokenExpiryTime > Date.now());
+}
+
+/**
+ * Central HTTP fetch wrapper for Drive API requests.
+ * On 401/403 the token is considered dead: clear it and flip to disconnected
+ * state (no silent popup-based retry is possible in the redirect flow).
  */
 async function fetchWithDriveAuth(url, options = {}) {
-  // Proactive check before request
-  await ensureValidToken();
-
-  if (!accessToken) {
+  if (!isTokenValid()) {
+    if (accessToken) {
+      // Token expired
+      accessToken = null;
+      tokenExpiryTime = 0;
+      localStorage.removeItem(TOKEN_INFO_KEY);
+      driveState.isConnected = false;
+      if (statusChangeCallback) statusChangeCallback(driveState);
+    }
     return null;
   }
 
@@ -256,39 +201,6 @@ async function fetchWithDriveAuth(url, options = {}) {
     return null;
   }
 
-  // Handle HTTP 401 (Unauthorized) or 403 (Forbidden)
-  if (response && (response.status === 401 || response.status === 403)) {
-    console.warn(`Drive API returned HTTP ${response.status}. Attempting silent token refresh...`);
-
-    if (tokenClient) {
-      const refreshed = await new Promise((resolve) => {
-        try {
-          tokenClient.requestAccessToken({ prompt: '' });
-          setTimeout(() => {
-            if (accessToken && (tokenExpiryTime - Date.now() > 0)) {
-              resolve(true);
-            } else {
-              resolve(false);
-            }
-          }, 2000);
-        } catch (e) {
-          resolve(false);
-        }
-      });
-
-      if (refreshed) {
-        // Retry request once with new token
-        try {
-          response = await makeRequest();
-        } catch (retryErr) {
-          console.error('Network error on retried Drive API request:', retryErr);
-          return null;
-        }
-      }
-    }
-  }
-
-  // Disconnect ONLY IF silent refresh failed and final response is still 401/403
   if (response && (response.status === 401 || response.status === 403)) {
     console.error(`Drive API persistent HTTP ${response.status}. Disconnecting user session.`);
     accessToken = null;
@@ -303,8 +215,14 @@ async function fetchWithDriveAuth(url, options = {}) {
 }
 
 /**
- * Initialize Google Token Client via Google Identity Services (GIS)
- * Secure silent restoration & mobile-friendly user-triggered login flow.
+ * Initialize Google Drive sync on app load.
+ * Order of operations (all passive — nothing here ever navigates or opens a window):
+ *   1. Restore cached user profile from localStorage.
+ *   2. Check if we just came back from the Google OAuth redirect (URL hash).
+ *      - If it carries a fresh token: store it, clean the URL, sync.
+ *      - If it carries an error: surface it, clean the URL.
+ *   3. Otherwise, restore a still-valid cached token from localStorage silently.
+ *   4. Otherwise, stay in "Déconnecté" state. Never redirect automatically.
  */
 export function initDriveSync(onStatusChange, onDataReceived) {
   if (onStatusChange) statusChangeCallback = onStatusChange;
@@ -318,7 +236,31 @@ export function initDriveSync(onStatusChange, onDataReceived) {
       } catch (e) {}
     }
 
-    // 2. Restore cached token if STILL VALID (expiresAt > Date.now())
+    // 2. Check for a fresh redirect result in the URL hash
+    const redirectResult = consumeAuthRedirectHash();
+
+    if (redirectResult && redirectResult.error) {
+      driveState.error = redirectResult.error;
+      driveState.isConnected = false;
+      if (onStatusChange) onStatusChange(driveState);
+      alert(describeOAuthError(redirectResult.error));
+      return;
+    }
+
+    if (redirectResult && redirectResult.accessToken) {
+      saveTokenInfo(redirectResult.accessToken, redirectResult.expiresIn);
+      driveState.isConnected = true;
+      driveState.error = null;
+      if (onStatusChange) onStatusChange(driveState);
+
+      fetchUserProfile().finally(() => {
+        if (onStatusChange) onStatusChange(driveState);
+        if (onDataReceived) syncWithDrive(onDataReceived, onStatusChange);
+      });
+      return;
+    }
+
+    // 3. No redirect result — try restoring a still-valid cached token
     const cachedTokenInfoStr = localStorage.getItem(TOKEN_INFO_KEY);
 
     if (cachedTokenInfoStr) {
@@ -333,10 +275,10 @@ export function initDriveSync(onStatusChange, onDataReceived) {
           driveState.isConnected = true;
           if (onStatusChange) onStatusChange(driveState);
 
-          // Perform initial sync using valid cached token without auto-prompting
-          syncWithDrive(onDataReceived, onStatusChange);
+          // Passive sync using the valid cached token — no prompt, no redirect.
+          if (onDataReceived) syncWithDrive(onDataReceived, onStatusChange);
         } else {
-          // Token expired -> Reset to disconnected state, DO NOT auto-trigger requestAccessToken() on load
+          // Token expired -> Reset to disconnected state, no auto-redirect.
           localStorage.removeItem(TOKEN_INFO_KEY);
           driveState.isConnected = false;
           if (onStatusChange) onStatusChange(driveState);
@@ -351,16 +293,6 @@ export function initDriveSync(onStatusChange, onDataReceived) {
       driveState.isConnected = false;
       if (onStatusChange) onStatusChange(driveState);
     }
-
-    // 3. Pre-initialize TokenClient eagerly so it's ready for user click.
-    //    On mobile: do NOT call any requestAccessToken here.
-    //    The tokenClient must be ready BEFORE user taps "Se connecter".
-    ensureGISLoaded(3000).then((isLoaded) => {
-      if (isLoaded) {
-        setupTokenClient(onDataReceived, onStatusChange);
-        console.log('GIS TokenClient pre-initialized and ready for user gesture.');
-      }
-    });
   } catch (initErr) {
     console.error('initDriveSync top-level error caught gracefully:', initErr);
     driveState.isConnected = false;
@@ -369,42 +301,47 @@ export function initDriveSync(onStatusChange, onDataReceived) {
 }
 
 /**
- * Trigger explicit OAuth login flow with user consent upon explicit click/tap.
- * CRITICAL: This function must be SYNCHRONOUS up to requestAccessToken()
- * to preserve the user-gesture context required by mobile browsers.
- * No async/await or Promise before the popup trigger.
+ * Fetch the connected user's profile (name, email, picture) via the Drive-scoped token.
  */
-export function loginGoogleDrive(onDataReceived, onStatusChange) {
+async function fetchUserProfile() {
   try {
-    // Synchronous check: if tokenClient not ready, try setup immediately
-    if (!tokenClient) {
-      if (window.google && window.google.accounts && window.google.accounts.oauth2) {
-        setupTokenClient(onDataReceived, onStatusChange || statusChangeCallback);
-      }
+    const userRes = await fetchWithDriveAuth('https://www.googleapis.com/oauth2/v3/userinfo');
+    if (userRes && userRes.ok) {
+      const uData = await userRes.json();
+      driveState.user = {
+        email: uData.email,
+        name: uData.name || uData.email,
+        picture: uData.picture || null
+      };
+      localStorage.setItem(USER_KEY, JSON.stringify(driveState.user));
     }
-
-    if (tokenClient) {
-      // MUST be called synchronously inside user gesture handler
-      tokenClient.requestAccessToken({ prompt: 'consent' });
-    } else {
-      // GIS SDK not loaded yet — inform user
-      alert("Le service Google Identity n'est pas encore prêt. Veuillez recharger la page ou réessayer dans un instant.");
-    }
-  } catch (e) {
-    console.error('Error triggering Google Drive login:', e);
-    alert("Impossible d'ouvrir la fenêtre de connexion Google. Veuillez vérifier votre bloqueur de pop-ups.");
+  } catch (ue) {
+    console.warn('UserInfo fetch warning:', ue);
   }
 }
 
 /**
- * Logout from Google Drive sync and clean localStorage
+ * Trigger the OAuth2 implicit-flow login by redirecting the full page to Google.
+ * CRITICAL: This must stay a plain, synchronous `window.location.href` assignment,
+ * called directly from the click handler — no async/await, no setTimeout before it.
+ * A full-page redirect is not subject to popup-blocking or third-party-cookie
+ * restrictions, so this works identically on mobile and desktop.
+ */
+export function loginGoogleDrive() {
+  try {
+    window.location.href = buildAuthUrl();
+  } catch (e) {
+    console.error('Error triggering Google Drive login redirect:', e);
+    alert("Impossible de lancer la connexion Google Drive. Veuillez réessayer.");
+  }
+}
+
+/**
+ * Logout from Google Drive sync and clean localStorage.
+ * Revokes the token via Google's standard revoke endpoint (no GIS library required).
  */
 export function logoutGoogleDrive(onStatusChange) {
-  try {
-    if (accessToken && window.google?.accounts?.oauth2) {
-      window.google.accounts.oauth2.revoke(accessToken, () => {});
-    }
-  } catch (e) {}
+  const tokenToRevoke = accessToken;
 
   accessToken = null;
   driveFileId = null;
@@ -412,8 +349,6 @@ export function logoutGoogleDrive(onStatusChange) {
 
   localStorage.removeItem(TOKEN_INFO_KEY);
   localStorage.removeItem(USER_KEY);
-  sessionStorage.removeItem('speedsuivi_gdrive_token');
-  sessionStorage.removeItem('speedsuivi_gdrive_expiry');
 
   driveState.isConnected = false;
   driveState.isSyncing = false;
@@ -422,6 +357,13 @@ export function logoutGoogleDrive(onStatusChange) {
   driveState.error = null;
 
   if (onStatusChange) onStatusChange(driveState);
+
+  if (tokenToRevoke) {
+    fetch(`${REVOKE_ENDPOINT}?token=${encodeURIComponent(tokenToRevoke)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+    }).catch(() => {});
+  }
 }
 
 /**
@@ -527,7 +469,7 @@ export function mergeCollections(localItems, remoteItems) {
   // 2. Merge remote items intelligently
   (remoteItems || []).forEach(remoteItem => {
     if (!remoteItem || !remoteItem.id) return;
-    
+
     if (!map.has(remoteItem.id)) {
       map.set(remoteItem.id, { ...remoteItem });
     } else {
@@ -564,7 +506,7 @@ export async function syncWithDrive(onDataReceived, onStatusChange) {
       const remoteCollection = await downloadDriveFile(driveFileId);
       if (Array.isArray(remoteCollection)) {
         const merged = mergeCollections(localCollection, remoteCollection);
-        
+
         // Save merged collection back to localStorage and Drive
         localStorage.setItem('media_tracker_v2', JSON.stringify(merged));
         await updateDriveFile(driveFileId, merged);
