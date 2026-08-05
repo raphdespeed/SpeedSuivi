@@ -301,7 +301,21 @@ export function loginGoogleDrive(onDataReceived, onStatusChange) {
     }
 
     if (tokenClient) {
-      tokenClient.requestAccessToken({ prompt: 'select_account' });
+      const cachedUserStr = localStorage.getItem(USER_KEY);
+      let userEmail = driveState.user?.email;
+      if (!userEmail && cachedUserStr) {
+        try { userEmail = JSON.parse(cachedUserStr)?.email; } catch (e) {}
+      }
+
+      const requestConfig = {};
+      if (userEmail) {
+        // Directly target the logged-in Google account without forcing account selector screen
+        requestConfig.hint = userEmail;
+      } else {
+        requestConfig.prompt = 'select_account';
+      }
+
+      tokenClient.requestAccessToken(requestConfig);
     } else {
       alert("Le service Google Identity est en cours de chargement. Veuillez recharger la page et réessayer.");
     }
