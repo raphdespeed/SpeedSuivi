@@ -1315,7 +1315,6 @@
                 <input 
                   type="number" 
                   min="1" 
-                  :max="selectedMedia.totalSeasons || 99" 
                   v-model.number="modalSeason" 
                   @input="onModalSeasonChange"
                   class="w-20 bg-surfaceBg border border-white/15 rounded-xl px-2 py-2 text-sm font-bold text-white text-center focus:outline-none focus:border-netflixRed"
@@ -1339,12 +1338,11 @@
                 <input 
                   type="number" 
                   min="0" 
-                  :max="selectedMedia.totalEpisodes || 999" 
                   v-model.number="modalEpisode" 
                   class="w-20 bg-surfaceBg border border-white/15 rounded-xl px-2 py-2 text-sm font-bold text-white text-center focus:outline-none focus:border-netflixRed"
                 />
                 <button 
-                  @click="modalEpisode = Math.min(selectedMedia.totalEpisodes || 999, modalEpisode + 1)"
+                  @click="modalEpisode = modalEpisode + 1"
                   class="w-9 h-9 rounded-lg bg-surfaceBg border border-white/15 hover:bg-netflixRed text-white text-lg font-bold flex items-center justify-center transition-colors"
                 >+</button>
               </div>
@@ -1868,18 +1866,14 @@
 
         const changeModalSeason = (delta) => {
           if (!selectedMedia.value) return;
-          const maxSeasons = selectedMedia.value.totalSeasons || 99;
           let next = (modalSeason.value || 1) + delta;
-          next = Math.max(1, Math.min(maxSeasons, next));
-          modalSeason.value = next;
+          modalSeason.value = Math.max(1, next);
           onModalSeasonChange();
         };
 
         const onModalSeasonChange = () => {
           if (!selectedMedia.value) return;
-          const maxSeasons = selectedMedia.value.totalSeasons || 99;
           if (modalSeason.value < 1) modalSeason.value = 1;
-          if (modalSeason.value > maxSeasons) modalSeason.value = maxSeasons;
 
           if (selectedMedia.value.seasonsEpisodesMap && selectedMedia.value.seasonsEpisodesMap[modalSeason.value]) {
             selectedMedia.value.totalEpisodes = selectedMedia.value.seasonsEpisodesMap[modalSeason.value];
@@ -2433,6 +2427,13 @@
               selectedMedia.value.galleryImages = formatted.galleryImages;
               if (formatted.totalEpisodes) selectedMedia.value.totalEpisodes = formatted.totalEpisodes;
               if (formatted.totalSeasons) selectedMedia.value.totalSeasons = formatted.totalSeasons;
+              if (formatted.seasonsEpisodesMap) {
+                selectedMedia.value.seasonsEpisodesMap = formatted.seasonsEpisodesMap;
+                // Re-evaluate total episodes for the currently selected modalSeason
+                if (formatted.seasonsEpisodesMap[modalSeason.value]) {
+                  selectedMedia.value.totalEpisodes = formatted.seasonsEpisodesMap[modalSeason.value];
+                }
+              }
             }
           } catch (e) {
             console.error('Error fetching extended media details:', e);
