@@ -2603,6 +2603,92 @@
           return found ? !!found.isFavorite : false;
         };
 
+        // Smart Search Aliases & Acronym Dictionary
+        const SEARCH_ALIASES = {
+          'got': 'Game of Thrones',
+          'g.o.t': 'Game of Thrones',
+          'g.o.t.': 'Game of Thrones',
+          'game of throne': 'Game of Thrones',
+          'game of thrones': 'Game of Thrones',
+          'hotd': 'House of the Dragon',
+          'hp': 'Harry Potter',
+          'snk': "L'Attaque des Titans",
+          'aot': "Attack on Titan",
+          'shingeki': "Shingeki no Kyojin",
+          'mha': 'My Hero Academia',
+          'bnha': 'Boku no Hero Academia',
+          'lotr': 'Le Seigneur des Anneaux',
+          'lord of the rings': 'The Lord of the Rings',
+          'seigneur des anneaux': 'Le Seigneur des Anneaux',
+          'op': 'One Piece',
+          'dbz': 'Dragon Ball Z',
+          'dbs': 'Dragon Ball Super',
+          'db': 'Dragon Ball',
+          'fma': 'Fullmetal Alchemist',
+          'fmab': 'Fullmetal Alchemist: Brotherhood',
+          'twd': 'The Walking Dead',
+          'b99': 'Brooklyn Nine-Nine',
+          'st': 'Stranger Things',
+          'himym': 'How I Met Your Mother',
+          'tbbt': 'The Big Bang Theory',
+          'ff': 'Fast & Furious',
+          'sw': 'Star Wars',
+          'mcu': 'Marvel',
+          'jojo': "JoJo's Bizarre Adventure",
+          'hxh': 'Hunter x Hunter',
+          'jjk': 'Jujutsu Kaisen',
+          'opm': 'One Punch Man',
+          'ds': 'Demon Slayer',
+          'kimetsu': 'Demon Slayer: Kimetsu no Yaiba',
+          'pb': 'Prison Break',
+          'bb': 'Breaking Bad',
+          'bcs': 'Better Call Saul',
+          'peaky': 'Peaky Blinders',
+          'lcdp': 'La Casa de Papel',
+          'squid': 'Squid Game',
+          'dn': 'Death Note',
+          'atla': 'Avatar: The Last Airbender'
+        };
+
+        const resolveSearchQuery = (rawQuery) => {
+          if (!rawQuery) return '';
+          const trimmed = rawQuery.trim();
+          const lower = trimmed.toLowerCase();
+          const cleanKey = lower.replace(/[._\-\s]+/g, '');
+
+          if (SEARCH_ALIASES[lower]) return SEARCH_ALIASES[lower];
+          if (SEARCH_ALIASES[cleanKey]) return SEARCH_ALIASES[cleanKey];
+
+          return trimmed;
+        };
+
+        const boostAcronymMatches = (items, originalQuery) => {
+          if (!items || items.length === 0 || !originalQuery) return items;
+          const q = originalQuery.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+          if (!q) return items;
+
+          return [...items].sort((a, b) => {
+            const titleA = (a.title || '').toLowerCase();
+            const titleB = (b.title || '').toLowerCase();
+
+            const exactA = titleA === q || (a.originalTitle || '').toLowerCase() === q;
+            const exactB = titleB === q || (b.originalTitle || '').toLowerCase() === q;
+            if (exactA && !exactB) return -1;
+            if (exactB && !exactA) return 1;
+
+            // Check initials matching (e.g. Game of Thrones -> got)
+            const initialsA = titleA.split(/\s+/).map(w => w[0]).join('').replace(/[^a-z0-9]/g, '');
+            const initialsB = titleB.split(/\s+/).map(w => w[0]).join('').replace(/[^a-z0-9]/g, '');
+
+            const initMatchA = initialsA === q;
+            const initMatchB = initialsB === q;
+            if (initMatchA && !initMatchB) return -1;
+            if (initMatchB && !initMatchA) return 1;
+
+            return 0;
+          });
+        };
+
         // TMDB Multi Search Page 1 (Global & Independent via Nginx Proxy)
         const onSearchInput = () => {
           const rawQuery = searchQuery.value || '';
@@ -2637,16 +2723,19 @@
 
           debounceTimer = setTimeout(async () => {
             try {
-              const url = `${BASE_URL}/search/multi?language=fr-FR&query=${encodeURIComponent(cleanedQuery)}&page=1&include_adult=false`;
+              const targetQuery = resolveSearchQuery(cleanedQuery);
+              const url = `${BASE_URL}/search/multi?language=fr-FR&query=${encodeURIComponent(targetQuery)}&page=1&include_adult=false`;
               const res = await fetch(url);
               const data = await res.json();
               
               totalSearchPages.value = data.total_pages || 1;
               totalSearchResults.value = data.total_results || 0;
 
-              const items = (data.results || [])
+              let items = (data.results || [])
                 .filter(i => i.media_type === 'movie' || i.media_type === 'tv')
                 .map(formatItem);
+
+              items = boostAcronymMatches(items, cleanedQuery);
 
               searchResults.value = items;
               items.forEach(item => enrichWatchProviders(item));
@@ -2669,7 +2758,8 @@
             isLoadingMore.value = true;
             searchPage.value++;
             try {
-              const url = `${BASE_URL}/search/multi?language=fr-FR&query=${encodeURIComponent(cleanedQuery)}&page=${searchPage.value}&include_adult=false`;
+              const targetQuery = resolveSearchQuery(cleanedQuery);
+              const url = `${BASE_URL}/search/multi?language=fr-FR&query=${encodeURIComponent(targetQuery)}&page=${searchPage.value}&include_adult=false`;
               const res = await fetch(url);
               const data = await res.json();
 
@@ -3075,10 +3165,11 @@
 
           const q = searchQuery.value ? searchQuery.value.trim().toLowerCase() : '';
           if (q) {
+            const resolvedQ = resolveSearchQuery(q).toLowerCase();
             list = list.filter(i => {
               const t = (i.title || '').toLowerCase();
               const ot = (i.originalTitle || '').toLowerCase();
-              return t.includes(q) || ot.includes(q);
+              return t.includes(q) || ot.includes(q) || t.includes(resolvedQ) || ot.includes(resolvedQ);
             });
           }
 
