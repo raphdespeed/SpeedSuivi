@@ -163,37 +163,11 @@
       width: 112px !important;
     }
 
-    /* Site-wide full-screen poster background (behind everything except the
-       media detail page, which already has its own hero backdrop image) —
-       one poster at a time, full-bleed, crossfading to the next. */
-    .bg-fullscreen-poster {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      transition: opacity 2s ease-in-out;
-    }
-    .bg-fade-enter-active, .bg-fade-leave-active {
-      transition: opacity 2s ease-in-out;
-    }
-    .bg-fade-enter-from, .bg-fade-leave-to {
-      opacity: 0;
-    }
   </style>
 </head>
 <body class="min-h-screen flex flex-col selection:bg-netflixRed selection:text-white">
 
   <div id="app" class="flex-1 flex flex-col">
-
-    <!-- Site-wide full-screen poster background, hidden only on the media detail
-         page (it already has its own hero backdrop). Sits behind every route. -->
-    <div v-if="currentRoute !== 'media'" class="fixed inset-0 z-0 overflow-hidden pointer-events-none select-none" aria-hidden="true">
-      <Transition name="bg-fade">
-        <img v-if="currentBgPoster" :key="currentBgPoster" :src="currentBgPoster" loading="lazy" alt="" class="bg-fullscreen-poster" />
-      </Transition>
-      <div class="absolute inset-0 bg-darkBg/85"></div>
-    </div>
 
     <!-- HEADER GLOBAL PERSISTANT (toujours visible sur toutes les vues) -->
     <header class="sticky top-0 z-50 glass-header border-b border-white/10 px-4 py-3 md:px-8">
@@ -2076,28 +2050,6 @@
         const topRatedSeries = ref([]);
         const isLoadingHome = ref(false);
 
-        // Pool of poster images for the site-wide background — reuses whatever
-        // the Home sections already fetched, no extra calls.
-        const backgroundPosters = computed(() => {
-          const pools = [trendingHome.value, recentMovies.value, recentSeries.value, recentAnime.value, recentKdrama.value, topRatedMovies.value, topRatedSeries.value];
-          const all = pools.flat().map(i => i.posterPath).filter(Boolean);
-          return [...new Set(all)].slice(0, 24);
-        });
-
-        // Cycles the full-screen background through one poster at a time
-        const bgPosterIndex = ref(0);
-        const currentBgPoster = computed(() => {
-          if (backgroundPosters.value.length === 0) return null;
-          return backgroundPosters.value[bgPosterIndex.value % backgroundPosters.value.length];
-        });
-        let bgPosterTimer = null;
-        const startBgPosterCycle = () => {
-          if (bgPosterTimer) return;
-          bgPosterTimer = setInterval(() => {
-            if (backgroundPosters.value.length > 0) bgPosterIndex.value++;
-          }, 8000);
-        };
-
         const isSearching = ref(false);
         const isLoadingMore = ref(false);
         const searchInputRef = ref(null);
@@ -3794,8 +3746,6 @@
         });
 
         onMounted(() => {
-          startBgPosterCycle();
-
           window.addEventListener('beforeinstallprompt', (e) => {
             e.preventDefault();
             deferredPrompt.value = e;
@@ -3875,8 +3825,6 @@
           topRatedMovies,
           topRatedSeries,
           isLoadingHome,
-          backgroundPosters,
-          currentBgPoster,
           sagaCollections,
           isLoadingSagaCollections,
           selectedSagaCollection,
