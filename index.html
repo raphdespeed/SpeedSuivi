@@ -2177,9 +2177,12 @@
         // via their own official search, pre-filled with the title. Anything
         // not in this map is left out of the "Regarder" section entirely
         // (no generic TMDB fallback).
+        // Disney+ has no public search URL that works via direct navigation
+        // (confirmed 404 — its search is in-app-only, behind login), so it
+        // just links to the homepage instead of a pre-filled search.
         const PLATFORM_SEARCH_URLS = {
           8: (title) => `https://www.netflix.com/search?q=${encodeURIComponent(title)}`,
-          337: (title) => `https://www.disneyplus.com/search?q=${encodeURIComponent(title)}`,
+          337: () => `https://www.disneyplus.com/`,
           119: (title) => `https://www.primevideo.com/search/ref=atv_nb_sr?phrase=${encodeURIComponent(title)}`,
           283: (title) => `https://www.crunchyroll.com/search?q=${encodeURIComponent(title)}`,
           531: (title) => `https://www.paramountplus.com/search/?q=${encodeURIComponent(title)}`
