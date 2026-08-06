@@ -1628,15 +1628,24 @@
         <!-- LEFT COLUMN: Profile & Personal Info (~300px fixed width) -->
         <aside class="w-full md:w-72 lg:w-80 shrink-0 space-y-6">
           <!-- Profile Picture HD -->
-          <div class="aspect-[2/3] bg-surfaceBg rounded-2xl overflow-hidden border-2 border-white/15 shadow-2xl relative group">
-            <img 
-              v-if="selectedPerson?.profilePath" 
-              :src="selectedPerson.profilePath" 
-              :alt="selectedPerson?.name" 
-              class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
+          <div
+            @click="selectedPerson?.profilePath && (activeLightboxImage = selectedPerson.profilePath)"
+            :class="['aspect-[2/3] bg-surfaceBg rounded-2xl overflow-hidden border-2 border-white/15 shadow-2xl relative group', selectedPerson?.profilePath ? 'cursor-pointer' : '']"
+            :title="selectedPerson?.profilePath ? 'Cliquez pour agrandir la photo en plein écran' : ''"
+          >
+            <img
+              v-if="selectedPerson?.profilePath"
+              :src="selectedPerson.profilePath"
+              :alt="selectedPerson?.name"
+              class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
             />
             <div v-else class="w-full h-full flex items-center justify-center bg-gray-800 text-gray-400 text-6xl">
               👤
+            </div>
+            <div v-if="selectedPerson?.profilePath" class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+              <span class="bg-black/80 backdrop-blur-md text-white text-xs font-heading font-bold px-3 py-1.5 rounded-full border border-white/20 shadow-xl flex items-center gap-1.5">
+                <span>🔍</span> Agrandir
+              </span>
             </div>
           </div>
 
@@ -1826,14 +1835,23 @@
 
         <!-- LEFT: Collection Poster -->
         <aside class="w-full md:w-72 lg:w-80 shrink-0 space-y-6">
-          <div class="aspect-[2/3] bg-surfaceBg rounded-2xl overflow-hidden border-2 border-white/15 shadow-2xl relative">
+          <div
+            @click="selectedSagaCollection.posterPath && (activeLightboxImage = selectedSagaCollection.posterPath)"
+            :class="['aspect-[2/3] bg-surfaceBg rounded-2xl overflow-hidden border-2 border-white/15 shadow-2xl relative group', selectedSagaCollection.posterPath ? 'cursor-pointer' : '']"
+            :title="selectedSagaCollection.posterPath ? 'Cliquez pour agrandir l\'affiche en plein écran' : ''"
+          >
             <img
               v-if="selectedSagaCollection.posterPath"
               :src="selectedSagaCollection.posterPath"
               :alt="selectedSagaCollection.name"
-              class="w-full h-full object-cover"
+              class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
             />
             <div v-else class="w-full h-full flex items-center justify-center bg-gray-800 text-gray-400 text-6xl">🏰</div>
+            <div v-if="selectedSagaCollection.posterPath" class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+              <span class="bg-black/80 backdrop-blur-md text-white text-xs font-heading font-bold px-3 py-1.5 rounded-full border border-white/20 shadow-xl flex items-center gap-1.5">
+                <span>🔍</span> Agrandir
+              </span>
+            </div>
           </div>
         </aside>
 
