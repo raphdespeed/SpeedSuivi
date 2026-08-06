@@ -1550,10 +1550,10 @@
             <span>🖼️</span> <span>Galerie de Photos & Captures</span>
           </h4>
           <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 md:gap-4">
-            <div 
-              v-for="(img, idx) in selectedMedia.galleryImages" 
+            <div
+              v-for="(img, idx) in selectedMedia.galleryImages"
               :key="idx"
-              @click="activeLightboxImage = img.full"
+              @click="openGalleryLightbox(selectedMedia.galleryImages, idx)"
               class="aspect-video bg-gray-900 rounded-xl overflow-hidden border border-white/10 hover:border-netflixRed hover:scale-[1.03] transition-all cursor-pointer shadow-lg group relative"
             >
               <img :src="img.thumb" :alt="`Capture ${idx + 1}`" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
@@ -1900,34 +1900,53 @@
     </div>
 
     <!-- Lightbox Modal for Photo Gallery & Cover/Poster Inspection -->
-    <div 
-      v-if="activeLightboxImage" 
-      @click="activeLightboxImage = null"
+    <div
+      v-if="activeLightboxImage"
+      @click="closeLightbox"
       class="fixed inset-0 z-[300] bg-black/95 flex flex-col items-center justify-center p-4 md:p-8 animate-fadeIn"
     >
-      <button 
-        @click="activeLightboxImage = null"
+      <button
+        @click="closeLightbox"
         class="absolute top-6 right-6 z-10 w-12 h-12 rounded-full bg-black/80 hover:bg-netflixRed text-white text-2xl flex items-center justify-center transition-colors border border-white/20 shadow-2xl cursor-pointer"
         title="Fermer (Échap)"
       >&times;</button>
-      
-      <img 
-        :src="activeLightboxImage" 
-        alt="Photo HD agrandie" 
-        class="max-w-full max-h-[82vh] object-contain rounded-xl shadow-2xl border border-white/10" 
+
+      <!-- Prev/Next Navigation Across the Whole Photo Gallery -->
+      <button
+        v-if="lightboxGallery.length > 1"
+        @click.stop="lightboxPrev"
+        class="absolute left-2 md:left-6 top-1/2 -translate-y-1/2 z-10 w-12 h-12 rounded-full bg-black/80 hover:bg-netflixRed text-white text-xl flex items-center justify-center transition-colors border border-white/20 shadow-2xl cursor-pointer"
+        title="Photo précédente"
+      >❮</button>
+      <button
+        v-if="lightboxGallery.length > 1"
+        @click.stop="lightboxNext"
+        class="absolute right-2 md:right-6 top-1/2 -translate-y-1/2 z-10 w-12 h-12 rounded-full bg-black/80 hover:bg-netflixRed text-white text-xl flex items-center justify-center transition-colors border border-white/20 shadow-2xl cursor-pointer"
+        title="Photo suivante"
+      >❯</button>
+
+      <img
+        :src="activeLightboxImage"
+        alt="Photo HD agrandie"
+        class="max-w-full max-h-[82vh] object-contain rounded-xl shadow-2xl border border-white/10"
         @click.stop
       />
 
+      <!-- Position Counter within the Photo Gallery -->
+      <div v-if="lightboxGallery.length > 1" class="mt-4 bg-black/80 text-white text-xs font-heading font-bold px-3 py-1.5 rounded-full border border-white/20 shadow-xl z-10">
+        {{ lightboxIndex + 1 }} / {{ lightboxGallery.length }}
+      </div>
+
       <!-- Quick Switcher between Backdrop & Poster when inspecting media -->
       <div v-if="selectedMedia && currentRoute === 'media' && (selectedMedia.backdropPath || selectedMedia.posterPath)" @click.stop class="mt-4 flex gap-3 z-10">
-        <button 
+        <button
           v-if="selectedMedia.backdropPath"
           @click="activeLightboxImage = selectedMedia.backdropPath"
           :class="['px-4 py-1.5 rounded-full text-xs font-heading font-bold transition-all border cursor-pointer', activeLightboxImage === selectedMedia.backdropPath ? 'bg-netflixRed text-white border-netflixRed shadow-lg' : 'bg-white/10 hover:bg-white/20 text-gray-300 border-white/20']"
         >
           🖼️ Couverture
         </button>
-        <button 
+        <button
           v-if="selectedMedia.posterPath"
           @click="activeLightboxImage = selectedMedia.posterPath"
           :class="['px-4 py-1.5 rounded-full text-xs font-heading font-bold transition-all border cursor-pointer', activeLightboxImage === selectedMedia.posterPath ? 'bg-netflixRed text-white border-netflixRed shadow-lg' : 'bg-white/10 hover:bg-white/20 text-gray-300 border-white/20']"
@@ -2590,6 +2609,38 @@
           if (famousCarouselRef.value) {
             famousCarouselRef.value.scrollBy({ left: 320, behavior: 'smooth' });
           }
+        };
+
+        // Lightbox gallery navigation: lets the fullscreen viewer step through
+        // every photo in the gallery (Prev/Next) instead of showing a single
+        // static image. Only populated when the lightbox is opened from the
+        // gallery grid — other lightbox openings (poster, backdrop, actor
+        // photo...) leave it empty so no Prev/Next controls appear.
+        const lightboxGallery = ref([]);
+        const lightboxIndex = ref(0);
+
+        const openGalleryLightbox = (images, idx) => {
+          lightboxGallery.value = images;
+          lightboxIndex.value = idx;
+          activeLightboxImage.value = images[idx].full;
+        };
+
+        const closeLightbox = () => {
+          activeLightboxImage.value = null;
+          lightboxGallery.value = [];
+          lightboxIndex.value = 0;
+        };
+
+        const lightboxNext = () => {
+          if (lightboxGallery.value.length === 0) return;
+          lightboxIndex.value = (lightboxIndex.value + 1) % lightboxGallery.value.length;
+          activeLightboxImage.value = lightboxGallery.value[lightboxIndex.value].full;
+        };
+
+        const lightboxPrev = () => {
+          if (lightboxGallery.value.length === 0) return;
+          lightboxIndex.value = (lightboxIndex.value - 1 + lightboxGallery.value.length) % lightboxGallery.value.length;
+          activeLightboxImage.value = lightboxGallery.value[lightboxIndex.value].full;
         };
 
         const castCarouselRef = ref(null);
@@ -3760,6 +3811,12 @@
           castCarouselRef,
           scrollCastLeft,
           scrollCastRight,
+          lightboxGallery,
+          lightboxIndex,
+          openGalleryLightbox,
+          closeLightbox,
+          lightboxNext,
+          lightboxPrev,
           formatDate,
           getAge,
           scrollToTop,
