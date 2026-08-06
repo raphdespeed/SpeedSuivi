@@ -860,6 +860,22 @@
                 </div>
               </div>
             </div>
+
+            <!-- Infinite Scroll / Load More for Saga Collections -->
+            <div v-if="sagaCollections.length > 0" class="flex flex-col items-center justify-center pt-8 pb-4 space-y-3">
+              <div v-if="isLoadingMore" class="flex items-center gap-2 text-sm text-gray-400 font-heading">
+                <div class="w-5 h-5 border-2 border-white/20 border-t-netflixRed rounded-full animate-spin"></div>
+                <span>Recherche de nouvelles sagas...</span>
+              </div>
+              <button
+                v-else-if="sagaHasMore"
+                @click="loadNextPage"
+                class="bg-surfaceBg hover:bg-cardBg border border-white/15 text-white font-heading font-bold text-sm px-6 py-3 rounded-xl shadow-lg transition-all flex items-center gap-2"
+              >
+                <span>🔽 Charger plus de sagas</span>
+              </button>
+              <p v-else class="text-xs text-gray-500 font-heading">Toutes les sagas disponibles ont été chargées.</p>
+            </div>
           </template>
 
           <!-- DEFAULT DISCOVER GRID -->
@@ -1948,6 +1964,8 @@
         const isLoadingSagaCollections = ref(false);
         const selectedSagaCollection = ref(null);
         const isLoadingSagaDetail = ref(false);
+        const sagaDiscoverPage = ref(1);
+        const sagaHasMore = ref(true);
 
         const recentMovies = ref([]);
         const recentSeries = ref([]);
@@ -2930,7 +2948,10 @@
             } finally {
               isLoadingMore.value = false;
             }
-          } 
+          }
+          else if (activeFilter.value === 'saga') {
+            await loadMoreSagaCollections();
+          }
           else {
             if (trendingPage.value >= totalTrendingPages.value) return;
             isLoadingMore.value = true;
@@ -2941,94 +2962,88 @@
         };
 
         // Curated list of popular saga/franchise titles used to resolve TMDB Collection IDs
-        const SAGA_SEED_TITLES = [
-          // Action / Aventure
-          'Fast and Furious', 'Mission Impossible', 'John Wick', 'Indiana Jones', 'Jurassic Park',
-          'Transformers', 'Die Hard', 'Mad Max', 'Jason Bourne', 'Rocky', 'Creed', 'Ocean\'s Eleven',
-          'Taken', 'National Treasure', 'The Karate Kid', 'Kingsman', 'James Bond', 'Rambo',
-          // Super-héros
-          'Avengers', 'Spider-Man', 'X-Men', 'Batman', 'Superman', 'Wonder Woman', 'Deadpool',
-          'Les Gardiens de la Galaxie', 'Thor', 'Captain America', 'Iron Man', 'Wolverine',
-          'Les 4 Fantastiques', 'Venom', 'Justice League', 'Ant-Man', 'Doctor Strange', 'Black Panther',
-          'Joker', 'The Suicide Squad',
-          // Science-fiction
-          'Star Wars', 'Star Trek', 'Matrix', 'Terminator', 'Alien', 'Predator',
-          'La Planète des singes', 'Dune', 'Men in Black', 'Retour vers le futur', 'Blade Runner',
-          'Divergente', 'Le Labyrinthe', 'Hunger Games', 'Tron',
-          // Fantastique
-          'Harry Potter', 'Les Animaux fantastiques', 'Le Seigneur des Anneaux', 'Le Hobbit',
-          'Twilight', 'Le Monde de Narnia', 'Percy Jackson', 'Dragons',
-          // Horreur
-          'Saw', 'Conjuring', 'Insidious', 'Halloween', 'Scream', 'Paranormal Activity',
-          'Resident Evil', 'Destination Finale', 'Chucky', 'Annabelle', 'Freddy', 'Vendredi 13',
-          'Evil Dead', 'American Nightmare',
-          // Animation / Familial
-          'Shrek', 'Toy Story', 'Moi, moche et méchant', 'L\'Âge de glace', 'Kung Fu Panda',
-          'Madagascar', 'Cars', 'La Reine des neiges', 'Hotel Transylvanie', 'Les Indestructibles',
-          'Le Monde de Nemo', 'Les Trolls', 'Vice-Versa',
-          // Comédie
-          'Very Bad Trip', 'American Pie', 'Austin Powers', 'Mon Beau-Père et Moi', 'Bad Boys',
-          'Jumanji',
-          // Autres
-          'Pirates des Caraïbes', 'Le Parrain'
-        ];
+        // Saga collections are discovered by scanning popular movies page by page
+        // (sorted by popularity) and resolving each one's belongs_to_collection —
+        // that field only exists on the /movie/{id} detail endpoint, never on
+        // /discover or /search list results, so each movie needs its own detail
+        // fetch. This surfaces virtually any franchise (not just a hand-picked
+        // list) and naturally supports infinite scroll: each "load more" just
+        // scans the next page(s) of popular movies for new, not-yet-seen collections.
+        const sagaSeenCollectionIds = new Set();
 
-        // Load the "Saga" collections grid (one card per franchise, not a flat movie list)
+        const fetchSagaCollectionsPage = async () => {
+          const page = sagaDiscoverPage.value;
+          const res = await fetch(`${BASE_URL}/discover/movie?language=fr-FR&sort_by=popularity.desc&page=${page}`);
+          if (!res.ok) { sagaHasMore.value = false; return; }
+          const data = await res.json();
+          const movies = data.results || [];
+          sagaDiscoverPage.value++;
+          if (movies.length === 0 || page >= (data.total_pages || 1) || page >= 500) {
+            sagaHasMore.value = false;
+          }
+          if (movies.length === 0) return;
+
+          const details = await Promise.all(movies.map(m =>
+            fetch(`${BASE_URL}/movie/${m.id}?language=fr-FR`).then(r => r.ok ? r.json() : null).catch(() => null)
+          ));
+
+          const newRefs = [];
+          details.forEach(d => {
+            const c = d?.belongs_to_collection;
+            if (c && !sagaSeenCollectionIds.has(c.id)) {
+              sagaSeenCollectionIds.add(c.id);
+              newRefs.push(c);
+            }
+          });
+          if (newRefs.length === 0) return;
+
+          const detailed = await Promise.all(newRefs.map(async (c) => {
+            try {
+              const res = await fetch(`${BASE_URL}/collection/${c.id}?language=fr-FR`);
+              if (!res.ok) return null;
+              const data = await res.json();
+              return {
+                id: data.id,
+                name: data.name,
+                overview: data.overview || '',
+                posterPath: data.poster_path ? `${POSTER_BASE}${data.poster_path}` : null,
+                backdropPath: data.backdrop_path ? `${BACKDROP_BASE}${data.backdrop_path}` : null,
+                filmCount: (data.parts || []).length
+              };
+            } catch (e) { return null; }
+          }));
+
+          sagaCollections.value = [...sagaCollections.value, ...detailed.filter(c => c && c.filmCount > 1)];
+        };
+
+        // Initial load of the "Saga" collections grid (resets and fetches a first batch)
         const loadSagaCollections = async () => {
           isSearching.value = true;
-          if (sagaCollections.value.length > 0) {
-            isSearching.value = false;
-            return;
-          }
+          sagaCollections.value = [];
+          sagaDiscoverPage.value = 1;
+          sagaHasMore.value = true;
+          sagaSeenCollectionIds.clear();
           isLoadingSagaCollections.value = true;
           try {
-            // Note: belongs_to_collection is only present on the /movie/{id} detail
-            // endpoint, not on /search/movie results, so each title needs a 2-step
-            // resolution (search -> top result -> movie detail). Resolved in parallel.
-            const resolved = await Promise.all(SAGA_SEED_TITLES.map(async (title) => {
-              try {
-                const res = await fetch(`${BASE_URL}/search/movie?language=fr-FR&query=${encodeURIComponent(title)}&page=1&include_adult=false`);
-                if (!res.ok) return null;
-                const data = await res.json();
-                const topResult = (data.results || [])[0];
-                if (!topResult) return null;
-
-                const detailRes = await fetch(`${BASE_URL}/movie/${topResult.id}?language=fr-FR`);
-                if (!detailRes.ok) return null;
-                const detail = await detailRes.json();
-                return detail.belongs_to_collection || null;
-              } catch (e) { return null; }
-            }));
-
-            const seenIds = new Set();
-            const found = [];
-            resolved.forEach(c => {
-              if (c && !seenIds.has(c.id)) {
-                seenIds.add(c.id);
-                found.push(c);
-              }
-            });
-
-            const detailed = await Promise.all(found.map(async (c) => {
-              try {
-                const res = await fetch(`${BASE_URL}/collection/${c.id}?language=fr-FR`);
-                if (!res.ok) return null;
-                const data = await res.json();
-                return {
-                  id: data.id,
-                  name: data.name,
-                  overview: data.overview || '',
-                  posterPath: data.poster_path ? `${POSTER_BASE}${data.poster_path}` : null,
-                  backdropPath: data.backdrop_path ? `${BACKDROP_BASE}${data.backdrop_path}` : null,
-                  filmCount: (data.parts || []).length
-                };
-              } catch (e) { return null; }
-            }));
-
-            sagaCollections.value = detailed.filter(c => c && c.filmCount > 0).sort((a, b) => b.filmCount - a.filmCount);
+            let attempts = 0;
+            while (sagaCollections.value.length < 12 && sagaHasMore.value && attempts < 8) {
+              await fetchSagaCollectionsPage();
+              attempts++;
+            }
           } finally {
             isLoadingSagaCollections.value = false;
             isSearching.value = false;
+          }
+        };
+
+        // Infinite scroll / "Load more" for the Saga collections grid
+        const loadMoreSagaCollections = async () => {
+          if (isLoadingMore.value || !sagaHasMore.value) return;
+          isLoadingMore.value = true;
+          try {
+            await fetchSagaCollectionsPage();
+          } finally {
+            isLoadingMore.value = false;
           }
         };
 
@@ -3576,6 +3591,7 @@
           isLoadingSagaCollections,
           selectedSagaCollection,
           isLoadingSagaDetail,
+          sagaHasMore,
           openSagaCollection,
           closeSagaCollection,
           isSearching,
