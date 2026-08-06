@@ -2308,11 +2308,16 @@
 
         const savedScrollY = ref(0);
 
+        // Two independent scroll memories so a nested view (e.g. a Saga collection
+        // opened from the grid) doesn't clobber the grid's own scroll position when
+        // the user drills further in (e.g. opens a film from within that collection).
         const saveScrollPosition = () => {
+          const y = window.scrollY || window.pageYOffset || 0;
           if (currentRoute.value === 'dashboard') {
-            const y = window.scrollY || window.pageYOffset || 0;
             savedScrollY.value = y;
             sessionStorage.setItem('dashboard_scroll', String(y));
+          } else if (currentRoute.value === 'collection') {
+            sessionStorage.setItem('collection_scroll', String(y));
           }
         };
 
@@ -2320,7 +2325,9 @@
           nextTick(() => {
             requestAnimationFrame(() => {
               setTimeout(() => {
-                const savedY = sessionStorage.getItem('dashboard_scroll') || savedScrollY.value || 0;
+                const savedY = currentRoute.value === 'collection'
+                  ? sessionStorage.getItem('collection_scroll')
+                  : (sessionStorage.getItem('dashboard_scroll') || savedScrollY.value || 0);
                 const topPos = parseInt(savedY, 10);
                 if (!isNaN(topPos) && topPos > 0) {
                   window.scrollTo({ top: topPos, behavior: 'instant' });
@@ -3049,8 +3056,11 @@
 
         // Open a Saga collection detail view (poster, overview, and its list of films)
         const openSagaCollection = async (col) => {
+          saveScrollPosition();
+          sessionStorage.removeItem('collection_scroll');
           selectedSagaCollection.value = { ...col, parts: [] };
           isLoadingSagaDetail.value = true;
+          window.scrollTo({ top: 0, behavior: 'instant' });
           try {
             const res = await fetch(`${BASE_URL}/collection/${col.id}?language=fr-FR`);
             if (res.ok) {
@@ -3081,6 +3091,7 @@
 
         const closeSagaCollection = () => {
           selectedSagaCollection.value = null;
+          restoreScrollPosition();
         };
 
         // Unified Discovery Engine (Cumulative Type / Provider / Genre / Year via Nginx Proxy)
