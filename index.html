@@ -2941,7 +2941,37 @@
         };
 
         // Curated list of popular saga/franchise titles used to resolve TMDB Collection IDs
-        const SAGA_SEED_TITLES = ['Harry Potter', 'Star Wars', 'Le Seigneur des Anneaux', 'Fast and Furious', 'Avengers', 'Spider-Man', 'Pirates des Caraïbes', 'Jurassic Park', 'Indiana Jones', 'Matrix', 'Hunger Games', 'Mission Impossible', 'John Wick', 'X-Men', 'Transformers', 'Twilight', 'Batman', 'Alien', 'Shrek', 'Terminator'];
+        const SAGA_SEED_TITLES = [
+          // Action / Aventure
+          'Fast and Furious', 'Mission Impossible', 'John Wick', 'Indiana Jones', 'Jurassic Park',
+          'Transformers', 'Die Hard', 'Mad Max', 'Jason Bourne', 'Rocky', 'Creed', 'Ocean\'s Eleven',
+          'Taken', 'National Treasure', 'The Karate Kid', 'Kingsman', 'James Bond', 'Rambo',
+          // Super-héros
+          'Avengers', 'Spider-Man', 'X-Men', 'Batman', 'Superman', 'Wonder Woman', 'Deadpool',
+          'Les Gardiens de la Galaxie', 'Thor', 'Captain America', 'Iron Man', 'Wolverine',
+          'Les 4 Fantastiques', 'Venom', 'Justice League', 'Ant-Man', 'Doctor Strange', 'Black Panther',
+          'Joker', 'The Suicide Squad',
+          // Science-fiction
+          'Star Wars', 'Star Trek', 'Matrix', 'Terminator', 'Alien', 'Predator',
+          'La Planète des singes', 'Dune', 'Men in Black', 'Retour vers le futur', 'Blade Runner',
+          'Divergente', 'Le Labyrinthe', 'Hunger Games', 'Tron',
+          // Fantastique
+          'Harry Potter', 'Les Animaux fantastiques', 'Le Seigneur des Anneaux', 'Le Hobbit',
+          'Twilight', 'Le Monde de Narnia', 'Percy Jackson', 'Dragons',
+          // Horreur
+          'Saw', 'Conjuring', 'Insidious', 'Halloween', 'Scream', 'Paranormal Activity',
+          'Resident Evil', 'Destination Finale', 'Chucky', 'Annabelle', 'Freddy', 'Vendredi 13',
+          'Evil Dead', 'American Nightmare',
+          // Animation / Familial
+          'Shrek', 'Toy Story', 'Moi, moche et méchant', 'L\'Âge de glace', 'Kung Fu Panda',
+          'Madagascar', 'Cars', 'La Reine des neiges', 'Hotel Transylvanie', 'Les Indestructibles',
+          'Le Monde de Nemo', 'Les Trolls', 'Vice-Versa',
+          // Comédie
+          'Very Bad Trip', 'American Pie', 'Austin Powers', 'Mon Beau-Père et Moi', 'Bad Boys',
+          'Jumanji',
+          // Autres
+          'Pirates des Caraïbes', 'Le Parrain'
+        ];
 
         // Load the "Saga" collections grid (one card per franchise, not a flat movie list)
         const loadSagaCollections = async () => {
