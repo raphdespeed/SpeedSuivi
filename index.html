@@ -2952,21 +2952,32 @@
           }
           isLoadingSagaCollections.value = true;
           try {
-            const seenIds = new Set();
-            const found = [];
-
-            for (const title of SAGA_SEED_TITLES) {
+            // Note: belongs_to_collection is only present on the /movie/{id} detail
+            // endpoint, not on /search/movie results, so each title needs a 2-step
+            // resolution (search -> top result -> movie detail). Resolved in parallel.
+            const resolved = await Promise.all(SAGA_SEED_TITLES.map(async (title) => {
               try {
                 const res = await fetch(`${BASE_URL}/search/movie?language=fr-FR&query=${encodeURIComponent(title)}&page=1&include_adult=false`);
-                if (!res.ok) continue;
+                if (!res.ok) return null;
                 const data = await res.json();
-                const withCollection = (data.results || []).find(m => m.belongs_to_collection);
-                if (withCollection && !seenIds.has(withCollection.belongs_to_collection.id)) {
-                  seenIds.add(withCollection.belongs_to_collection.id);
-                  found.push(withCollection.belongs_to_collection);
-                }
-              } catch (e) { /* skip this title, continue with the rest */ }
-            }
+                const topResult = (data.results || [])[0];
+                if (!topResult) return null;
+
+                const detailRes = await fetch(`${BASE_URL}/movie/${topResult.id}?language=fr-FR`);
+                if (!detailRes.ok) return null;
+                const detail = await detailRes.json();
+                return detail.belongs_to_collection || null;
+              } catch (e) { return null; }
+            }));
+
+            const seenIds = new Set();
+            const found = [];
+            resolved.forEach(c => {
+              if (c && !seenIds.has(c.id)) {
+                seenIds.add(c.id);
+                found.push(c);
+              }
+            });
 
             const detailed = await Promise.all(found.map(async (c) => {
               try {
