@@ -1350,13 +1350,13 @@
           <h4 class="text-xs font-heading font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
             <span>📺</span> <span>Disponible en France en streaming sur :</span>
           </h4>
-          <div v-if="selectedMedia.providers && selectedMedia.providers.length > 0" class="flex flex-wrap gap-2.5 pt-1">
+          <div v-if="officialProviders.length > 0" class="flex flex-wrap gap-2.5 pt-1">
             <button
-              v-for="prov in selectedMedia.providers"
+              v-for="prov in officialProviders"
               :key="prov.id"
-              @click="openWatchLink(selectedMedia.watchLink)"
-              :class="['flex items-center gap-2.5 bg-surfaceBg border border-white/10 px-3.5 py-2 rounded-xl text-xs font-heading font-semibold text-white shadow transition-colors', selectedMedia.watchLink ? 'hover:border-netflixRed hover:bg-white/5 cursor-pointer' : 'cursor-default']"
-              :title="selectedMedia.watchLink ? `Voir où regarder « ${selectedMedia.title} »` : ''"
+              @click="openWatchLink(prov, selectedMedia)"
+              class="flex items-center gap-2.5 bg-surfaceBg border border-white/10 px-3.5 py-2 rounded-xl text-xs font-heading font-semibold text-white shadow transition-colors hover:border-netflixRed hover:bg-white/5 cursor-pointer"
+              :title="`Rechercher « ${selectedMedia.title} » sur ${prov.name}`"
             >
               <img v-if="prov.logo" :src="prov.logo" :alt="prov.name" class="w-6 h-6 rounded-md object-cover" />
               <span>{{ prov.name }}</span>
@@ -2171,15 +2171,35 @@
           return list;
         });
 
+        // TMDB's free API only exposes one aggregate "where to watch" link per
+        // title (no true per-provider deep link — that requires JustWatch's
+        // paid partner API), so we only show platforms we can link straight to
+        // via their own official search, pre-filled with the title. Anything
+        // not in this map is left out of the "Regarder" section entirely
+        // (no generic TMDB fallback).
+        const PLATFORM_SEARCH_URLS = {
+          8: (title) => `https://www.netflix.com/search?q=${encodeURIComponent(title)}`,
+          337: (title) => `https://www.disneyplus.com/search?q=${encodeURIComponent(title)}`,
+          119: (title) => `https://www.primevideo.com/search/ref=atv_nb_sr?phrase=${encodeURIComponent(title)}`,
+          283: (title) => `https://www.crunchyroll.com/search?q=${encodeURIComponent(title)}`,
+          531: (title) => `https://www.paramountplus.com/search/?q=${encodeURIComponent(title)}`
+        };
+
         // Note: intentionally not inlined as `window.open(...)` directly in a
         // template expression — Vue's render-context proxy can end up caching
         // bare globals like `window` as an unresolved setup binding on first
         // access, permanently shadowing the real global for that component
         // afterwards (throws "Cannot read properties of undefined (reading
         // 'open')"). Routing through a real function avoids the proxy entirely.
-        const openWatchLink = (url) => {
+        const openWatchLink = (prov, media) => {
+          const url = PLATFORM_SEARCH_URLS[prov?.id]?.(media.title);
           if (url) window.open(url, '_blank', 'noopener,noreferrer');
         };
+
+        // Only the platforms we can deep-link to officially — the small logo
+        // stack shown on poster cards elsewhere still shows every provider,
+        // this filtered list is just for the clickable "Regarder" badges.
+        const officialProviders = computed(() => (selectedMedia.value?.providers || []).filter(p => p.id in PLATFORM_SEARCH_URLS));
 
         const enrichWatchProviders = async (item) => {
           if (item.providersLoaded) return;
@@ -2210,12 +2230,23 @@
             });
 
             item.providers = providerList;
-            item.watchLink = frData?.link || null;
             item.providersLoaded = true;
+            // `item` may be the raw object passed in before Vue wrapped it in
+            // a reactive proxy (e.g. selectedMedia.value = item), so mutating
+            // it directly can silently bypass reactivity. If this item is the
+            // currently open media, also write through the reactive ref so
+            // anything computed from selectedMedia.providers actually updates.
+            if (selectedMedia.value && selectedMedia.value.id === item.id) {
+              selectedMedia.value.providers = providerList;
+              selectedMedia.value.providersLoaded = true;
+            }
           } catch (e) {
             item.providers = [];
-            item.watchLink = null;
             item.providersLoaded = true;
+            if (selectedMedia.value && selectedMedia.value.id === item.id) {
+              selectedMedia.value.providers = [];
+              selectedMedia.value.providersLoaded = true;
+            }
           }
         };
 
@@ -3866,6 +3897,7 @@
           resetAllFilters,
           handleImgError,
           openWatchLink,
+          officialProviders,
           toggleFavorite,
           isFavoriteItem,
           saveItem,
