@@ -35,6 +35,7 @@ function saveTokenInfo(token, expiresInSeconds) {
   accessToken = token;
   const expiresIn = expiresInSeconds || 3600;
   tokenExpiryTime = Date.now() + (expiresIn * 1000);
+  console.info(`[DriveSync] Nouveau token reçu, expire dans ${expiresIn}s (à ${new Date(tokenExpiryTime).toLocaleTimeString()}).`);
 
   try {
     localStorage.setItem(TOKEN_INFO_KEY, JSON.stringify({
@@ -169,6 +170,7 @@ async function ensureValidToken() {
   }
 
   // Token expired -> Reset session state cleanly without silent background popups
+  console.warn(`[DriveSync] Token expiré selon l'horloge locale (prévu à ${new Date(tokenExpiryTime).toLocaleTimeString()}, maintenant ${new Date(now).toLocaleTimeString()}) — session effacée.`);
   accessToken = null;
   tokenExpiryTime = 0;
   localStorage.removeItem(TOKEN_INFO_KEY);
@@ -179,9 +181,11 @@ async function ensureValidToken() {
 }
 
 /**
- * Central HTTP fetch wrapper for Drive API requests with clean 401/403 session clearing.
+ * Central HTTP fetch wrapper for Drive API requests.
+ * Only a persistent 401 (token genuinely rejected, confirmed by a retry) clears the session.
+ * A 403 (rate limit, quota, permission) never means the token is dead, so it's left untouched.
  */
-async function fetchWithDriveAuth(url, options = {}) {
+async function fetchWithDriveAuth(url, options = {}, isRetry = false) {
   const isValid = await ensureValidToken();
 
   if (!isValid || !accessToken) {
@@ -196,8 +200,23 @@ async function fetchWithDriveAuth(url, options = {}) {
 
   try {
     const response = await makeRequest();
+
     if (response && (response.status === 401 || response.status === 403)) {
-      console.warn(`Drive API HTTP ${response.status}: clearing session.`);
+      let detail = '';
+      try { detail = JSON.stringify(await response.clone().json()); } catch (e) {}
+      console.warn(`[DriveSync] HTTP ${response.status} sur ${url} (retry=${isRetry}): ${detail}`);
+
+      if (response.status === 403) {
+        return response;
+      }
+
+      if (!isRetry) {
+        console.warn('[DriveSync] 401 reçu, nouvelle tentative avant de considérer la session morte.');
+        await new Promise(r => setTimeout(r, 700));
+        return fetchWithDriveAuth(url, options, true);
+      }
+
+      console.warn('[DriveSync] 401 persistant après nouvelle tentative: session effacée.');
       accessToken = null;
       tokenExpiryTime = 0;
       localStorage.removeItem(TOKEN_INFO_KEY);
