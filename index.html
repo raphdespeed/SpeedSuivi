@@ -826,6 +826,44 @@
 
         <!-- Trending or Provider Discover Recommendations when search is empty -->
         <div v-else class="space-y-4">
+
+          <!-- SAGA COLLECTIONS BROWSING -->
+          <template v-if="activeFilter === 'saga'">
+            <h3 class="font-heading font-bold text-lg text-white flex items-center gap-2">
+              <span>🏰 Collections Sagas & Franchises</span>
+            </h3>
+
+            <div v-if="isLoadingSagaCollections" class="flex justify-center py-16">
+              <div class="w-10 h-10 border-4 border-white/10 border-t-netflixRed rounded-full animate-spin"></div>
+            </div>
+
+            <div v-else-if="sagaCollections.length === 0" class="bg-cardBg border border-white/10 rounded-2xl text-center py-16 px-6 space-y-4 max-w-md mx-auto shadow-xl">
+              <div class="text-5xl">🏰</div>
+              <h3 class="font-heading font-bold text-xl text-white">Aucune collection trouvée</h3>
+            </div>
+
+            <div v-else class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 2xl:grid-cols-8 gap-4 md:gap-6">
+              <div
+                v-for="col in sagaCollections"
+                :key="col.id"
+                @click="openSagaCollection(col)"
+                class="bg-cardBg border border-white/10 rounded-xl overflow-hidden cursor-pointer group hover:-translate-y-1.5 hover:border-white/30 transition-all duration-300 shadow-xl relative flex flex-col"
+              >
+                <div class="relative aspect-[2/3] bg-gray-900 overflow-hidden">
+                  <img v-if="col.posterPath" :src="col.posterPath" :alt="col.name" @error="handleImgError($event, col.name)" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
+                  <div v-else class="w-full h-full flex items-center justify-center text-4xl text-gray-600">🏰</div>
+                  <span class="absolute top-2 left-2 text-[10px] font-heading font-bold px-2 py-0.5 rounded backdrop-blur-md shadow bg-amber-600/90 text-white font-extrabold">🏰 Saga</span>
+                </div>
+                <div class="p-3 flex flex-col flex-1">
+                  <h3 class="font-heading font-bold text-sm text-white line-clamp-2 mb-1 leading-snug" :title="col.name">{{ col.name }}</h3>
+                  <p class="text-xs text-gray-400 font-semibold mt-auto pt-2">{{ col.filmCount }} films</p>
+                </div>
+              </div>
+            </div>
+          </template>
+
+          <!-- DEFAULT DISCOVER GRID -->
+          <template v-else>
           <h3 class="font-heading font-bold text-lg text-white flex items-center gap-2">
             <span>{{ activeFilter === 'kdrama' ? '🇰🇷 K-Dramas Populaires en Corée & France' : activeProviderFilter === 'all' ? '🔥 Tendances du moment' : '📺 Nouveautés & Populaires' }}</span>
             <span v-if="activeProviderFilter !== 'all'" class="text-xs bg-white/10 px-2 py-0.5 rounded-full font-normal">
@@ -928,6 +966,7 @@
               <span>🔽 Charger plus de titres (Page {{ trendingPage + 1 }} sur {{ totalTrendingPages }})</span>
             </button>
           </div>
+          </template>
         </div>
       </div>
 
@@ -1714,6 +1753,86 @@
 
     </div>
 
+    <!-- ================= ROUTE: SAGA COLLECTION DETAIL ================= -->
+    <div v-else-if="currentRoute === 'collection'" class="min-h-screen bg-darkBg text-white flex flex-col flex-1 pb-24 animate-fadeIn relative z-40" key="collection-view">
+
+      <!-- Sticky Top Back Bar -->
+      <div class="sticky top-[72px] left-4 md:top-[72px] md:left-8 z-50 px-4 md:px-8">
+        <button
+          @click="closeSagaCollection"
+          class="inline-flex items-center gap-2 bg-black/80 hover:bg-netflixRed text-white text-xs md:text-sm font-heading font-bold px-4 py-2.5 rounded-full border border-white/20 shadow-2xl backdrop-blur-md transition-all active:scale-95 group"
+        >
+          <span class="transform group-hover:-translate-x-1 transition-transform">←</span>
+          <span>Retour aux collections</span>
+        </button>
+      </div>
+
+      <div v-if="isLoadingSagaDetail" class="flex justify-center items-center flex-1 py-32">
+        <div class="flex flex-col items-center gap-4">
+          <div class="w-12 h-12 border-4 border-white/10 border-t-netflixRed rounded-full animate-spin"></div>
+          <p class="text-xs font-heading font-semibold text-gray-400">Chargement de la collection...</p>
+        </div>
+      </div>
+
+      <div v-else-if="selectedSagaCollection" class="max-w-7xl mx-auto w-full px-4 md:px-8 pt-8 flex flex-col md:flex-row gap-8 md:gap-10 flex-1">
+
+        <!-- LEFT: Collection Poster -->
+        <aside class="w-full md:w-72 lg:w-80 shrink-0 space-y-6">
+          <div class="aspect-[2/3] bg-surfaceBg rounded-2xl overflow-hidden border-2 border-white/15 shadow-2xl relative">
+            <img
+              v-if="selectedSagaCollection.posterPath"
+              :src="selectedSagaCollection.posterPath"
+              :alt="selectedSagaCollection.name"
+              class="w-full h-full object-cover"
+            />
+            <div v-else class="w-full h-full flex items-center justify-center bg-gray-800 text-gray-400 text-6xl">🏰</div>
+          </div>
+        </aside>
+
+        <!-- RIGHT: Collection Info & Films -->
+        <main class="flex-1 space-y-8 pb-8">
+          <div class="space-y-3">
+            <h1 class="font-heading font-extrabold text-3xl md:text-4xl text-white">{{ selectedSagaCollection.name }}</h1>
+            <div class="flex flex-wrap items-center gap-4 text-sm text-gray-400 font-heading font-semibold">
+              <span class="flex items-center gap-1.5">🎬 {{ selectedSagaCollection.parts.length }} films</span>
+              <span v-if="selectedSagaCollection.yearStart" class="flex items-center gap-1.5">
+                📅 {{ selectedSagaCollection.yearStart }}<span v-if="selectedSagaCollection.yearEnd && selectedSagaCollection.yearEnd !== selectedSagaCollection.yearStart"> - {{ selectedSagaCollection.yearEnd }}</span>
+              </span>
+            </div>
+            <p v-if="selectedSagaCollection.overview" class="text-gray-300 text-sm leading-relaxed max-w-3xl">{{ selectedSagaCollection.overview }}</p>
+          </div>
+
+          <div class="space-y-4">
+            <h3 class="font-heading font-bold text-lg text-white flex items-center gap-2">
+              <span>🎬</span> <span>Films de la collection</span>
+            </h3>
+
+            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
+              <div
+                v-for="(item, idx) in selectedSagaCollection.parts"
+                :key="item.id"
+                @click="openModal(item)"
+                class="bg-cardBg border border-white/10 rounded-xl overflow-hidden cursor-pointer group hover:-translate-y-1.5 hover:border-white/30 transition-all duration-300 shadow-xl relative flex flex-col"
+              >
+                <div class="relative aspect-[2/3] bg-gray-900 overflow-hidden">
+                  <img :src="item.posterPath" :alt="item.title" @error="handleImgError($event, item.title)" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
+                  <span class="absolute top-2 left-2 w-6 h-6 rounded-full bg-netflixRed text-white text-[11px] font-heading font-extrabold flex items-center justify-center shadow">{{ idx + 1 }}</span>
+                  <span v-if="item.voteAverage" class="absolute top-2 right-2 bg-amber-500/90 text-black text-[10px] font-heading font-extrabold px-1.5 py-0.5 rounded">⭐ {{ item.voteAverage }}</span>
+                </div>
+                <div class="p-3 flex flex-col flex-1">
+                  <h4 class="font-heading font-bold text-sm text-white line-clamp-2 mb-2 leading-snug" :title="item.title">{{ item.title }}</h4>
+                  <div class="mt-auto pt-2 flex gap-1.5">
+                    <button @click.stop="saveItem(item, 'in_progress')" class="flex-1 text-[11px] font-heading font-bold py-1 bg-netflixRed hover:bg-netflixRedHover text-white rounded-lg transition-colors">+ En cours</button>
+                    <button @click.stop="saveItem(item, 'watchlist')" class="flex-1 text-[11px] font-heading font-bold py-1 bg-traktPurple hover:opacity-90 text-white rounded-lg transition-colors">+ À voir</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+
     <!-- Lightbox Modal for Photo Gallery & Cover/Poster Inspection -->
     <div 
       v-if="activeLightboxImage" 
@@ -1825,6 +1944,11 @@
         const trendingPage = ref(1);
         const totalTrendingPages = ref(1);
 
+        const sagaCollections = ref([]);
+        const isLoadingSagaCollections = ref(false);
+        const selectedSagaCollection = ref(null);
+        const isLoadingSagaDetail = ref(false);
+
         const recentMovies = ref([]);
         const recentSeries = ref([]);
         const recentAnime = ref([]);
@@ -1910,7 +2034,7 @@
           { id: 'all', label: 'Tous les types' },
           { id: 'movie', label: '🎬 Films' },
           { id: 'series', label: '📺 Séries' },
-          { id: 'saga', label: '🏰 Sagas & Franchises' },
+          { id: 'saga', label: '🏰 Saga' },
           { id: 'anime', label: '🇯🇵 Animés' },
           { id: 'kdrama', label: '🇰🇷 K-Dramas' }
         ];
@@ -2193,6 +2317,7 @@
           const wasInDetail = !!(selectedMedia.value || selectedPerson.value);
           selectedMedia.value = null;
           selectedPerson.value = null;
+          selectedSagaCollection.value = null;
           activeTab.value = tabName;
           window.location.hash = `#${tabName}`;
           if (wasInDetail) {
@@ -2815,6 +2940,93 @@
           }
         };
 
+        // Curated list of popular saga/franchise titles used to resolve TMDB Collection IDs
+        const SAGA_SEED_TITLES = ['Harry Potter', 'Star Wars', 'Le Seigneur des Anneaux', 'Fast and Furious', 'Avengers', 'Spider-Man', 'Pirates des Caraïbes', 'Jurassic Park', 'Indiana Jones', 'Matrix', 'Hunger Games', 'Mission Impossible', 'John Wick', 'X-Men', 'Transformers', 'Twilight', 'Batman', 'Alien', 'Shrek', 'Terminator'];
+
+        // Load the "Saga" collections grid (one card per franchise, not a flat movie list)
+        const loadSagaCollections = async () => {
+          isSearching.value = true;
+          if (sagaCollections.value.length > 0) {
+            isSearching.value = false;
+            return;
+          }
+          isLoadingSagaCollections.value = true;
+          try {
+            const seenIds = new Set();
+            const found = [];
+
+            for (const title of SAGA_SEED_TITLES) {
+              try {
+                const res = await fetch(`${BASE_URL}/search/movie?language=fr-FR&query=${encodeURIComponent(title)}&page=1&include_adult=false`);
+                if (!res.ok) continue;
+                const data = await res.json();
+                const withCollection = (data.results || []).find(m => m.belongs_to_collection);
+                if (withCollection && !seenIds.has(withCollection.belongs_to_collection.id)) {
+                  seenIds.add(withCollection.belongs_to_collection.id);
+                  found.push(withCollection.belongs_to_collection);
+                }
+              } catch (e) { /* skip this title, continue with the rest */ }
+            }
+
+            const detailed = await Promise.all(found.map(async (c) => {
+              try {
+                const res = await fetch(`${BASE_URL}/collection/${c.id}?language=fr-FR`);
+                if (!res.ok) return null;
+                const data = await res.json();
+                return {
+                  id: data.id,
+                  name: data.name,
+                  overview: data.overview || '',
+                  posterPath: data.poster_path ? `${POSTER_BASE}${data.poster_path}` : null,
+                  backdropPath: data.backdrop_path ? `${BACKDROP_BASE}${data.backdrop_path}` : null,
+                  filmCount: (data.parts || []).length
+                };
+              } catch (e) { return null; }
+            }));
+
+            sagaCollections.value = detailed.filter(c => c && c.filmCount > 0).sort((a, b) => b.filmCount - a.filmCount);
+          } finally {
+            isLoadingSagaCollections.value = false;
+            isSearching.value = false;
+          }
+        };
+
+        // Open a Saga collection detail view (poster, overview, and its list of films)
+        const openSagaCollection = async (col) => {
+          selectedSagaCollection.value = { ...col, parts: [] };
+          isLoadingSagaDetail.value = true;
+          try {
+            const res = await fetch(`${BASE_URL}/collection/${col.id}?language=fr-FR`);
+            if (res.ok) {
+              const data = await res.json();
+              const parts = (data.parts || [])
+                .filter(p => p.poster_path)
+                .sort((a, b) => new Date(a.release_date || 0) - new Date(b.release_date || 0))
+                .map(p => formatItem({ ...p, media_type: 'movie', category: 'saga', isSaga: true }));
+
+              const years = parts.map(p => p.year).filter(Boolean);
+
+              selectedSagaCollection.value = {
+                id: data.id,
+                name: data.name,
+                overview: data.overview || '',
+                posterPath: data.poster_path ? `${POSTER_BASE}${data.poster_path}` : col.posterPath,
+                backdropPath: data.backdrop_path ? `${BACKDROP_BASE}${data.backdrop_path}` : col.backdropPath,
+                parts,
+                yearStart: years.length ? Math.min(...years) : null,
+                yearEnd: years.length ? Math.max(...years) : null
+              };
+              parts.forEach(item => enrichWatchProviders(item));
+            }
+          } finally {
+            isLoadingSagaDetail.value = false;
+          }
+        };
+
+        const closeSagaCollection = () => {
+          selectedSagaCollection.value = null;
+        };
+
         // Unified Discovery Engine (Cumulative Type / Provider / Genre / Year via Nginx Proxy)
         const fetchDiscoveryContent = async (page = 1, append = false) => {
           if (!append) isSearching.value = true;
@@ -2853,33 +3065,8 @@
 
             if (isAnyFilterActive) {
               if (activeFilter.value === 'saga') {
-                const sagaQueries = ['Harry Potter', 'Star Wars', 'Le Seigneur des Anneaux', 'Fast and Furious', 'Avengers', 'Spider-Man', 'Pirates des Caraïbes', 'Jurassic Park', 'Indiana Jones', 'Matrix', 'Hunger Games', 'Mission Impossible', 'John Wick', 'X-Men', 'Transformers', 'Twilight', 'Batman', 'Alien', 'Shrek'];
-                const pageQueries = sagaQueries.slice((page - 1) * 6, page * 6);
-                
-                if (pageQueries.length > 0) {
-                  const sagaFetches = pageQueries.map(q => 
-                    fetch(`${BASE_URL}/search/multi?language=fr-FR&query=${encodeURIComponent(q)}&page=1&include_adult=false`)
-                      .then(r => r.ok ? r.json() : { results: [] })
-                      .catch(() => ({ results: [] }))
-                  );
-                  const sagaResults = await Promise.all(sagaFetches);
-                  const combinedSagas = [];
-                  sagaResults.forEach(res => {
-                    if (res.results) {
-                      res.results.filter(i => i.poster_path).slice(0, 3).forEach(i => combinedSagas.push(formatItem({ ...i, category: 'saga', isSaga: true })));
-                    }
-                  });
-
-                  if (append) {
-                    trendingResults.value = [...trendingResults.value, ...combinedSagas];
-                  } else {
-                    trendingResults.value = combinedSagas;
-                    trendingPage.value = 1;
-                  }
-                  totalTrendingPages.value = 3;
-                  combinedSagas.forEach(item => enrichWatchProviders(item));
-                  return;
-                }
+                loadSagaCollections();
+                return;
               } else if (activeFilter.value === 'kdrama') {
                 if (shouldFetchTV) {
                   tvUrl = `${BASE_URL}/discover/tv?with_origin_country=KR&with_original_language=ko&language=fr-FR&sort_by=popularity.desc&page=${page}${providerParam}${genreString}${tvYearParam}`;
@@ -3260,6 +3447,7 @@
         const currentRoute = computed(() => {
           if (selectedPerson.value) return 'actor';
           if (selectedMedia.value) return 'media';
+          if (selectedSagaCollection.value) return 'collection';
           return 'dashboard';
         });
 
@@ -3343,6 +3531,12 @@
           topRatedMovies,
           topRatedSeries,
           isLoadingHome,
+          sagaCollections,
+          isLoadingSagaCollections,
+          selectedSagaCollection,
+          isLoadingSagaDetail,
+          openSagaCollection,
+          closeSagaCollection,
           isSearching,
           isLoadingMore,
           searchInputRef,
