@@ -1351,14 +1351,16 @@
             <span>📺</span> <span>Disponible en France en streaming sur :</span>
           </h4>
           <div v-if="selectedMedia.providers && selectedMedia.providers.length > 0" class="flex flex-wrap gap-2.5 pt-1">
-            <div 
-              v-for="prov in selectedMedia.providers" 
+            <button
+              v-for="prov in selectedMedia.providers"
               :key="prov.id"
-              class="flex items-center gap-2.5 bg-surfaceBg border border-white/10 px-3.5 py-2 rounded-xl text-xs font-heading font-semibold text-white shadow"
+              @click="openWatchLink(selectedMedia.watchLink)"
+              :class="['flex items-center gap-2.5 bg-surfaceBg border border-white/10 px-3.5 py-2 rounded-xl text-xs font-heading font-semibold text-white shadow transition-colors', selectedMedia.watchLink ? 'hover:border-netflixRed hover:bg-white/5 cursor-pointer' : 'cursor-default']"
+              :title="selectedMedia.watchLink ? `Voir où regarder « ${selectedMedia.title} »` : ''"
             >
               <img v-if="prov.logo" :src="prov.logo" :alt="prov.name" class="w-6 h-6 rounded-md object-cover" />
               <span>{{ prov.name }}</span>
-            </div>
+            </button>
           </div>
           <p v-else class="text-xs text-gray-500 italic">Recherche des plateformes de streaming en cours ou indisponible en abonnement direct en France.</p>
         </div>
@@ -1903,6 +1905,8 @@
     <div
       v-if="activeLightboxImage"
       @click="closeLightbox"
+      @touchstart="handleLightboxTouchStart"
+      @touchend="handleLightboxTouchEnd"
       class="fixed inset-0 z-[300] bg-black/95 flex flex-col items-center justify-center p-4 md:p-8 animate-fadeIn"
     >
       <button
@@ -2167,6 +2171,16 @@
           return list;
         });
 
+        // Note: intentionally not inlined as `window.open(...)` directly in a
+        // template expression — Vue's render-context proxy can end up caching
+        // bare globals like `window` as an unresolved setup binding on first
+        // access, permanently shadowing the real global for that component
+        // afterwards (throws "Cannot read properties of undefined (reading
+        // 'open')"). Routing through a real function avoids the proxy entirely.
+        const openWatchLink = (url) => {
+          if (url) window.open(url, '_blank', 'noopener,noreferrer');
+        };
+
         const enrichWatchProviders = async (item) => {
           if (item.providersLoaded) return;
           try {
@@ -2196,9 +2210,11 @@
             });
 
             item.providers = providerList;
+            item.watchLink = frData?.link || null;
             item.providersLoaded = true;
           } catch (e) {
             item.providers = [];
+            item.watchLink = null;
             item.providersLoaded = true;
           }
         };
@@ -2641,6 +2657,24 @@
           if (lightboxGallery.value.length === 0) return;
           lightboxIndex.value = (lightboxIndex.value - 1 + lightboxGallery.value.length) % lightboxGallery.value.length;
           activeLightboxImage.value = lightboxGallery.value[lightboxIndex.value].full;
+        };
+
+        // Mobile swipe navigation for the lightbox (left = next, right = prev)
+        let lightboxTouchStartX = 0;
+        let lightboxTouchStartY = 0;
+
+        const handleLightboxTouchStart = (e) => {
+          lightboxTouchStartX = e.changedTouches[0].clientX;
+          lightboxTouchStartY = e.changedTouches[0].clientY;
+        };
+
+        const handleLightboxTouchEnd = (e) => {
+          if (lightboxGallery.value.length <= 1) return;
+          const dx = e.changedTouches[0].clientX - lightboxTouchStartX;
+          const dy = e.changedTouches[0].clientY - lightboxTouchStartY;
+          if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) {
+            if (dx < 0) lightboxNext(); else lightboxPrev();
+          }
         };
 
         const castCarouselRef = ref(null);
@@ -3817,6 +3851,8 @@
           closeLightbox,
           lightboxNext,
           lightboxPrev,
+          handleLightboxTouchStart,
+          handleLightboxTouchEnd,
           formatDate,
           getAge,
           scrollToTop,
@@ -3829,6 +3865,7 @@
           hasActiveFilters,
           resetAllFilters,
           handleImgError,
+          openWatchLink,
           toggleFavorite,
           isFavoriteItem,
           saveItem,
