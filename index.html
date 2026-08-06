@@ -2130,6 +2130,42 @@
           return list;
         });
 
+        const enrichWatchProviders = async (item) => {
+          if (item.providersLoaded) return;
+          try {
+            const type = item.mediaType === 'movie' ? 'movie' : 'tv';
+            const url = `${BASE_URL}/${type}/${item.tmdbId}/watch/providers`;
+            const res = await fetch(url);
+            const data = await res.json();
+            const frData = data.results?.FR;
+
+            const providerList = [];
+            const seen = new Set();
+            const rawProviders = [
+              ...(frData?.flatrate || []),
+              ...(frData?.buy || []),
+              ...(frData?.rent || [])
+            ];
+
+            rawProviders.forEach(p => {
+              if (!seen.has(p.provider_id)) {
+                seen.add(p.provider_id);
+                providerList.push({
+                  id: p.provider_id,
+                  name: p.provider_name,
+                  logo: p.logo_path ? `https://image.tmdb.org/t/p/w92${p.logo_path}` : null
+                });
+              }
+            });
+
+            item.providers = providerList;
+            item.providersLoaded = true;
+          } catch (e) {
+            item.providers = [];
+            item.providersLoaded = true;
+          }
+        };
+
         // Load collection from localStorage synchronously before state initialization
         const loadCollection = () => {
           try {
@@ -2209,32 +2245,14 @@
 
         const activeLightboxImage = ref(null);
 
-        const SAGA_KEYWORDS = [
-          'harry potter', 'star wars', 'seigneur des anneaux', 'lord of the rings',
-          'fast & furious', 'fast and furious', 'marvel', 'avengers', 'spider-man',
-          'spiderman', 'batman', 'pirates des caraïbes', 'pirates of the caribbean',
-          'james bond', 'jurassic', 'indiana jones', 'matrix', 'hunger games',
-          'twilight', 'mission: impossible', 'mission impossible', 'x-men',
-          'alien', 'terminator', 'john wick', 'transformers', 'shrek',
-          'toy story', 'l\'âge de glace', 'ice age', 'planète des singes',
-          'planet of the apes', 'conjuring', 'mad max', 'die hard', 'saw',
-          'resident evil', 'divergente', 'maze runner', 'le labyrinthe', 'the hobbit',
-          'le hobbit', 'despicable me', 'moi, moche et méchant', 'minions',
-          'le parrain', 'the godfather', 'back to the future', 'retour vers le futur',
-          'dune', 'game of thrones', 'house of the dragon'
-        ];
-
         // Category detection
+        // Note: "saga" is only ever set explicitly (e.g. Saga collection cards
+        // themselves, or films shown within a collection's detail page) — an
+        // individual movie/show is never auto-tagged "saga" just because it
+        // belongs to a TMDB collection. It keeps its real type (Film/Série/...)
+        // so the badge always reflects what the item actually is.
         const detectCategory = (item) => {
           if (item.category === 'saga' || item.isSaga) return 'saga';
-
-          const hasCollection = !!(item.belongs_to_collection || item.belongsToCollection || item.collectionName || item.belongs_to_collection?.id);
-          const titleLower = (item.title || item.name || item.original_title || item.original_name || '').toLowerCase();
-          
-          const isSagaTitle = SAGA_KEYWORDS.some(kw => titleLower.includes(kw));
-          if (hasCollection || isSagaTitle) {
-            return 'saga';
-          }
 
           if (item.media_type === 'movie' || (!item.media_type && item.title && !item.name)) {
             return 'movie';
@@ -2746,42 +2764,6 @@
         };
 
         // Async Watch Providers fetcher for results (France region)
-        const enrichWatchProviders = async (item) => {
-          if (item.providersLoaded) return;
-          try {
-            const type = item.mediaType === 'movie' ? 'movie' : 'tv';
-            const url = `${BASE_URL}/${type}/${item.tmdbId}/watch/providers`;
-            const res = await fetch(url);
-            const data = await res.json();
-            const frData = data.results?.FR;
-
-            const providerList = [];
-            const seen = new Set();
-            const rawProviders = [
-              ...(frData?.flatrate || []),
-              ...(frData?.buy || []),
-              ...(frData?.rent || [])
-            ];
-
-            rawProviders.forEach(p => {
-              if (!seen.has(p.provider_id)) {
-                seen.add(p.provider_id);
-                providerList.push({
-                  id: p.provider_id,
-                  name: p.provider_name,
-                  logo: p.logo_path ? `https://image.tmdb.org/t/p/w92${p.logo_path}` : null
-                });
-              }
-            });
-
-            item.providers = providerList;
-            item.providersLoaded = true;
-          } catch (e) {
-            item.providers = [];
-            item.providersLoaded = true;
-          }
-        };
-
         // Toggle "À revoir" (Rewatch)
         const toggleFavorite = (item) => {
           const itemId = item.id;
