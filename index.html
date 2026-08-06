@@ -676,6 +676,38 @@
           <div class="w-10 h-10 border-4 border-white/10 border-t-netflixRed rounded-full animate-spin"></div>
         </div>
 
+        <!-- Saga Collections Search Results (searching collections by name, not individual movies) -->
+        <div v-else-if="searchQuery.trim() && activeFilter === 'saga'" class="space-y-6">
+          <div class="flex items-center justify-between text-xs text-gray-400 font-heading">
+            <span>{{ sagaCollections.length }} collection(s) trouvée(s) pour "{{ searchQuery }}"</span>
+          </div>
+
+          <div v-if="sagaCollections.length === 0" class="bg-cardBg border border-white/10 rounded-2xl text-center py-16 px-6 space-y-4 max-w-md mx-auto shadow-xl">
+            <div class="text-5xl">🏰</div>
+            <h3 class="font-heading font-bold text-xl text-white">Aucune saga trouvée</h3>
+            <p class="text-gray-400 text-sm">Aucune collection ne correspond à "{{ searchQuery }}".</p>
+          </div>
+
+          <div v-else class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 2xl:grid-cols-8 gap-4 md:gap-6">
+            <div
+              v-for="col in sagaCollections"
+              :key="col.id"
+              @click="openSagaCollection(col)"
+              class="bg-cardBg border border-white/10 rounded-xl overflow-hidden cursor-pointer group hover:-translate-y-1.5 hover:border-white/30 transition-all duration-300 shadow-xl relative flex flex-col"
+            >
+              <div class="relative aspect-[2/3] bg-gray-900 overflow-hidden">
+                <img v-if="col.posterPath" :src="col.posterPath" :alt="col.name" @error="handleImgError($event, col.name)" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
+                <div v-else class="w-full h-full flex items-center justify-center text-4xl text-gray-600">🏰</div>
+                <span class="absolute top-2 left-2 text-[10px] font-heading font-bold px-2 py-0.5 rounded backdrop-blur-md shadow bg-amber-600/90 text-white font-extrabold">🏰 Saga</span>
+              </div>
+              <div class="p-3 flex flex-col flex-1">
+                <h3 class="font-heading font-bold text-sm text-white line-clamp-2 mb-1 leading-snug" :title="col.name">{{ col.name }}</h3>
+                <p class="text-xs text-gray-400 font-semibold mt-auto pt-2">{{ col.filmCount }} films</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Active Textual Search Results Grid -->
         <div v-else-if="searchQuery.trim() && filteredSearchResults.length > 0" class="space-y-6">
           
@@ -2871,6 +2903,36 @@
         };
 
         // TMDB Multi Search Page 1 (Global & Independent via Nginx Proxy)
+        // Text search across all media (movies/TV) via /search/multi — shared by
+        // onSearchInput (debounced while typing) and onFilterChange (immediate,
+        // needed when switching away from Saga mode back to a normal type filter,
+        // since Saga mode never populates searchResults via this path).
+        const performTextSearch = async (cleanedQuery) => {
+          isSearching.value = true;
+          try {
+            const targetQuery = resolveSearchQuery(cleanedQuery);
+            const url = `${BASE_URL}/search/multi?language=fr-FR&query=${encodeURIComponent(targetQuery)}&page=1&include_adult=false`;
+            const res = await fetch(url);
+            const data = await res.json();
+
+            totalSearchPages.value = data.total_pages || 1;
+            totalSearchResults.value = data.total_results || 0;
+
+            let items = (data.results || [])
+              .filter(i => i.media_type === 'movie' || i.media_type === 'tv')
+              .map(formatItem);
+
+            items = boostAcronymMatches(items, cleanedQuery);
+
+            searchResults.value = items;
+            items.forEach(item => enrichWatchProviders(item));
+          } catch (err) {
+            console.error('Search error:', err);
+          } finally {
+            isSearching.value = false;
+          }
+        };
+
         const onSearchInput = () => {
           const rawQuery = searchQuery.value || '';
           const cleanedQuery = rawQuery.trim();
@@ -2899,33 +2961,14 @@
             window.location.hash = '#search';
           }
 
-          activeFilter.value = 'all';
           isSearching.value = true;
 
-          debounceTimer = setTimeout(async () => {
-            try {
-              const targetQuery = resolveSearchQuery(cleanedQuery);
-              const url = `${BASE_URL}/search/multi?language=fr-FR&query=${encodeURIComponent(targetQuery)}&page=1&include_adult=false`;
-              const res = await fetch(url);
-              const data = await res.json();
-              
-              totalSearchPages.value = data.total_pages || 1;
-              totalSearchResults.value = data.total_results || 0;
+          if (activeFilter.value === 'saga') {
+            debounceTimer = setTimeout(() => searchSagaCollections(cleanedQuery), 300);
+            return;
+          }
 
-              let items = (data.results || [])
-                .filter(i => i.media_type === 'movie' || i.media_type === 'tv')
-                .map(formatItem);
-
-              items = boostAcronymMatches(items, cleanedQuery);
-
-              searchResults.value = items;
-              items.forEach(item => enrichWatchProviders(item));
-            } catch (err) {
-              console.error('Search error:', err);
-            } finally {
-              isSearching.value = false;
-            }
-          }, 300);
+          debounceTimer = setTimeout(() => performTextSearch(cleanedQuery), 300);
         };
 
         // Load Next Page (Infinite Scroll / Load More via Nginx Proxy)
@@ -2933,6 +2976,12 @@
           if (isLoadingMore.value || isSearching.value) return;
 
           const cleanedQuery = searchQuery.value ? searchQuery.value.trim() : '';
+
+          if (cleanedQuery && activeFilter.value === 'saga') {
+            // Saga name search (via /search/collection) isn't paginated in v1 —
+            // TMDB collection search result sets are small enough to return in one page.
+            return;
+          }
 
           if (cleanedQuery) {
             if (searchPage.value >= totalSearchPages.value) return;
@@ -2978,17 +3027,30 @@
         // scans the next page(s) of popular movies for new, not-yet-seen collections.
         const sagaSeenCollectionIds = new Set();
 
+        // Fetches 2 discover pages per call (instead of 1) so each scroll-triggered
+        // batch surfaces more new collections at once — fewer visible pauses while
+        // scrolling through the grid.
         const fetchSagaCollectionsPage = async () => {
-          const page = sagaDiscoverPage.value;
-          const res = await fetch(`${BASE_URL}/discover/movie?language=fr-FR&sort_by=popularity.desc&page=${page}`);
-          if (!res.ok) { sagaHasMore.value = false; return; }
-          const data = await res.json();
-          const movies = data.results || [];
-          sagaDiscoverPage.value++;
-          if (movies.length === 0 || page >= (data.total_pages || 1) || page >= 500) {
+          const startPage = sagaDiscoverPage.value;
+          const pages = [startPage, startPage + 1];
+
+          const pageResults = await Promise.all(pages.map(p =>
+            fetch(`${BASE_URL}/discover/movie?language=fr-FR&sort_by=popularity.desc&page=${p}`)
+              .then(r => r.ok ? r.json() : null)
+              .catch(() => null)
+          ));
+
+          const validResults = pageResults.filter(Boolean);
+          if (validResults.length === 0) { sagaHasMore.value = false; return; }
+
+          const totalPages = validResults[0].total_pages || 1;
+          sagaDiscoverPage.value = startPage + pages.length;
+          if (sagaDiscoverPage.value > totalPages || sagaDiscoverPage.value >= 500) {
             sagaHasMore.value = false;
           }
-          if (movies.length === 0) return;
+
+          const movies = validResults.flatMap(d => d.results || []);
+          if (movies.length === 0) { sagaHasMore.value = false; return; }
 
           const details = await Promise.all(movies.map(m =>
             fetch(`${BASE_URL}/movie/${m.id}?language=fr-FR`).then(r => r.ok ? r.json() : null).catch(() => null)
@@ -3051,6 +3113,42 @@
             await fetchSagaCollectionsPage();
           } finally {
             isLoadingMore.value = false;
+          }
+        };
+
+        // Search Sagas by name (uses TMDB's dedicated collection search instead of
+        // filtering individual movies by category — a text search for a franchise
+        // should return the franchise itself, not every movie that belongs to one).
+        const searchSagaCollections = async (query) => {
+          isSearching.value = true;
+          try {
+            const res = await fetch(`${BASE_URL}/search/collection?language=fr-FR&query=${encodeURIComponent(query)}&page=1`);
+            if (!res.ok) { sagaCollections.value = []; return; }
+            const data = await res.json();
+            const results = data.results || [];
+
+            const detailed = await Promise.all(results.map(async (c) => {
+              try {
+                const r2 = await fetch(`${BASE_URL}/collection/${c.id}?language=fr-FR`);
+                if (!r2.ok) return null;
+                const d2 = await r2.json();
+                return {
+                  id: d2.id,
+                  name: d2.name,
+                  overview: d2.overview || c.overview || '',
+                  posterPath: d2.poster_path ? `${POSTER_BASE}${d2.poster_path}` : (c.poster_path ? `${POSTER_BASE}${c.poster_path}` : null),
+                  backdropPath: d2.backdrop_path ? `${BACKDROP_BASE}${d2.backdrop_path}` : null,
+                  filmCount: (d2.parts || []).length
+                };
+              } catch (e) { return null; }
+            }));
+
+            sagaCollections.value = detailed.filter(c => c && c.filmCount > 1);
+          } catch (e) {
+            console.error('Saga search error:', e);
+            sagaCollections.value = [];
+          } finally {
+            isSearching.value = false;
           }
         };
 
@@ -3215,7 +3313,11 @@
           showBackToTop.value = window.scrollY >= 300;
           if (activeTab.value === 'search') {
             const scrollPosition = window.innerHeight + window.scrollY;
-            const threshold = document.body.offsetHeight - 500;
+            // Trigger further ahead of the bottom for Saga browsing: each batch
+            // involves several chained API calls, so loading earlier keeps new
+            // cards arriving before the user actually reaches the end.
+            const margin = activeFilter.value === 'saga' ? 1500 : 500;
+            const threshold = document.body.offsetHeight - margin;
             if (scrollPosition >= threshold) {
               loadNextPage();
             }
@@ -3251,10 +3353,15 @@
         const onFilterChange = () => {
           trendingPage.value = 1;
           isSearching.value = true;
-          if (!searchQuery.value.trim()) {
+          const cleanedQuery = searchQuery.value ? searchQuery.value.trim() : '';
+          if (activeFilter.value === 'saga' && cleanedQuery) {
+            searchSagaCollections(cleanedQuery);
+            return;
+          }
+          if (!cleanedQuery) {
             fetchDiscoveryContent(1);
           } else {
-            isSearching.value = false;
+            performTextSearch(cleanedQuery);
           }
         };
 
