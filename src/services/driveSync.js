@@ -12,6 +12,7 @@ const SCOPE = 'https://www.googleapis.com/auth/drive.appdata https://www.googlea
 const FILE_NAME = 'speedsuivi_data.json';
 const TOKEN_INFO_KEY = 'gdrive_token_info';
 const USER_KEY = 'speedsuivi_gdrive_user';
+const TOMBSTONES_KEY = 'speedsuivi_deleted_ids';
 
 let tokenClient = null;
 let accessToken = null;
@@ -459,9 +460,70 @@ async function updateDriveFile(fileId, collection) {
 }
 
 /**
+ * Deletion tombstones: { [itemId]: deletedAtISOString }
+ * Recorded locally whenever an item is explicitly removed, so that a merge with
+ * an older copy (this device or another) never silently resurrects it.
+ */
+function getLocalTombstones() {
+  try {
+    const raw = localStorage.getItem(TOMBSTONES_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch (e) {
+    return {};
+  }
+}
+
+function saveLocalTombstones(tombstones) {
+  try {
+    localStorage.setItem(TOMBSTONES_KEY, JSON.stringify(tombstones || {}));
+  } catch (e) {
+    console.error('Error storing deletion tombstones:', e);
+  }
+}
+
+/**
+ * Record that an item was explicitly deleted, so future merges keep it deleted
+ * unless it gets re-added later with a fresher timestamp.
+ */
+export function recordDeletion(itemId) {
+  if (!itemId) return;
+  const tombstones = getLocalTombstones();
+  tombstones[itemId] = new Date().toISOString();
+  saveLocalTombstones(tombstones);
+}
+
+function mergeTombstones(localTombstones, remoteTombstones) {
+  const merged = { ...(localTombstones || {}) };
+  Object.entries(remoteTombstones || {}).forEach(([id, deletedAt]) => {
+    if (!merged[id] || new Date(deletedAt).getTime() > new Date(merged[id]).getTime()) {
+      merged[id] = deletedAt;
+    }
+  });
+  return merged;
+}
+
+/**
+ * Drive files were historically a raw array. Accepts both that legacy shape
+ * and the current { items, tombstones } shape.
+ */
+function normalizeRemotePayload(data) {
+  if (Array.isArray(data)) {
+    return { items: data, tombstones: {} };
+  }
+  if (data && Array.isArray(data.items)) {
+    return {
+      items: data.items,
+      tombstones: (data.tombstones && typeof data.tombstones === 'object') ? data.tombstones : {}
+    };
+  }
+  return null;
+}
+
+/**
  * Intelligent Conflict Resolution Engine
  */
-export function mergeCollections(localItems, remoteItems) {
+export function mergeCollections(localItems, remoteItems, localTombstones = {}, remoteTombstones = {}) {
+  const tombstones = mergeTombstones(localTombstones, remoteTombstones);
   const map = new Map();
 
   (localItems || []).forEach(item => {
@@ -472,7 +534,7 @@ export function mergeCollections(localItems, remoteItems) {
 
   (remoteItems || []).forEach(remoteItem => {
     if (!remoteItem || !remoteItem.id) return;
-    
+
     if (!map.has(remoteItem.id)) {
       map.set(remoteItem.id, { ...remoteItem });
     } else {
@@ -488,7 +550,14 @@ export function mergeCollections(localItems, remoteItems) {
     }
   });
 
-  return Array.from(map.values());
+  const items = Array.from(map.values()).filter(item => {
+    const deletedAt = tombstones[item.id];
+    if (!deletedAt) return true;
+    const itemTime = new Date(item.updatedAt || item.addedAt || 0).getTime();
+    return new Date(deletedAt).getTime() < itemTime;
+  });
+
+  return { items, tombstones };
 }
 
 /**
@@ -504,19 +573,23 @@ export async function syncWithDrive(onDataReceived, onStatusChange) {
     driveFileId = await findDriveFile();
 
     const localCollection = JSON.parse(localStorage.getItem('media_tracker_v2') || '[]');
+    const localTombstones = getLocalTombstones();
 
     if (driveFileId) {
-      const remoteCollection = await downloadDriveFile(driveFileId);
-      if (Array.isArray(remoteCollection)) {
-        const merged = mergeCollections(localCollection, remoteCollection);
-        
+      const remote = normalizeRemotePayload(await downloadDriveFile(driveFileId));
+      if (remote) {
+        const { items: merged, tombstones: mergedTombstones } = mergeCollections(
+          localCollection, remote.items, localTombstones, remote.tombstones
+        );
+
         localStorage.setItem('media_tracker_v2', JSON.stringify(merged));
-        await updateDriveFile(driveFileId, merged);
+        saveLocalTombstones(mergedTombstones);
+        await updateDriveFile(driveFileId, { items: merged, tombstones: mergedTombstones });
 
         if (onDataReceived) onDataReceived(merged);
       }
     } else {
-      driveFileId = await createDriveFile(localCollection);
+      driveFileId = await createDriveFile({ items: localCollection, tombstones: localTombstones });
     }
 
     driveState.lastSyncTime = new Date();
@@ -542,15 +615,16 @@ export async function forcePullFromDrive(onDataReceived, onStatusChange) {
       throw new Error("Aucun fichier distant trouvé sur Google Drive.");
     }
 
-    const remoteCollection = await downloadDriveFile(driveFileId);
-    if (!Array.isArray(remoteCollection)) {
+    const remote = normalizeRemotePayload(await downloadDriveFile(driveFileId));
+    if (!remote) {
       throw new Error("Fichier distant corrompu ou au format invalide.");
     }
 
-    localStorage.setItem('media_tracker_v2', JSON.stringify(remoteCollection));
+    localStorage.setItem('media_tracker_v2', JSON.stringify(remote.items));
+    saveLocalTombstones(remote.tombstones);
     driveState.lastSyncTime = new Date();
-    if (onDataReceived) onDataReceived(remoteCollection);
-    return remoteCollection.length;
+    if (onDataReceived) onDataReceived(remote.items);
+    return remote.items.length;
   } finally {
     driveState.isSyncing = false;
     if (onStatusChange) onStatusChange(driveState);
@@ -566,11 +640,12 @@ export async function forcePushToDrive(currentCollection, onStatusChange) {
 
   try {
     if (!driveFileId) driveFileId = await findDriveFile();
+    const payload = { items: currentCollection, tombstones: getLocalTombstones() };
 
     if (driveFileId) {
-      await updateDriveFile(driveFileId, currentCollection);
+      await updateDriveFile(driveFileId, payload);
     } else {
-      driveFileId = await createDriveFile(currentCollection);
+      driveFileId = await createDriveFile(payload);
     }
 
     driveState.lastSyncTime = new Date();
@@ -597,10 +672,12 @@ export function triggerAutoSaveToDrive(currentCollection, onStatusChange) {
         driveFileId = await findDriveFile();
       }
 
+      const payload = { items: currentCollection, tombstones: getLocalTombstones() };
+
       if (driveFileId) {
-        await updateDriveFile(driveFileId, currentCollection);
+        await updateDriveFile(driveFileId, payload);
       } else {
-        driveFileId = await createDriveFile(currentCollection);
+        driveFileId = await createDriveFile(payload);
       }
 
       driveState.lastSyncTime = new Date();

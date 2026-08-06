@@ -1993,7 +1993,8 @@
       logoutGoogleDrive, 
       triggerAutoSaveToDrive,
       forcePullFromDrive,
-      forcePushToDrive
+      forcePushToDrive,
+      recordDeletion
     } from './src/services/driveSync.js';
 
     const { createApp, ref, computed, onMounted, onUnmounted, watch, nextTick } = Vue;
@@ -3586,8 +3587,12 @@
           if (existingIndex >= 0) {
             const title = collection.value[existingIndex].title;
             collection.value.splice(existingIndex, 1);
+            recordDeletion(itemId);
             saveCollection();
             showToast(`"${title}" retiré de la bibliothèque`, 'info');
+            if (selectedMedia.value && selectedMedia.value.id === itemId) {
+              closeDetailView();
+            }
           }
         };
 
