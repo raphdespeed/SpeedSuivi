@@ -258,6 +258,8 @@ export function initDriveSync(onStatusChange, onDataReceived) {
           accessToken = token;
           tokenExpiryTime = expiresAt;
           driveState.isConnected = true;
+          const remainingMs = expiresAt - Date.now();
+          console.info(`[DriveSync] Token restauré depuis le cache local, encore valide ${Math.round(remainingMs / 1000)}s (jusqu'à ${new Date(expiresAt).toLocaleTimeString()}).`);
 
           // Fetch user profile if not cached yet
           if (!driveState.user) {
@@ -281,6 +283,7 @@ export function initDriveSync(onStatusChange, onDataReceived) {
           // Perform initial sync using valid cached token
           syncWithDrive(onDataReceived, onStatusChange);
         } else {
+          console.warn('[DriveSync] Token en cache absent ou expiré au chargement de la page — reconnexion nécessaire.');
           localStorage.removeItem(TOKEN_INFO_KEY);
           driveState.isConnected = false;
           if (onStatusChange) onStatusChange(driveState);
