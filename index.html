@@ -163,31 +163,22 @@
       width: 112px !important;
     }
 
-    /* Site-wide scrolling poster background (behind everything except the
-       media detail page, which already has its own hero backdrop image) */
-    @keyframes bg-scroll-left {
-      from { transform: translateX(0); }
-      to { transform: translateX(-50%); }
-    }
-    @keyframes bg-scroll-right {
-      from { transform: translateX(-50%); }
-      to { transform: translateX(0); }
-    }
-    .bg-poster-row {
-      display: flex;
-      gap: 1rem;
-      width: max-content;
-      animation: bg-scroll-left 100s linear infinite;
-    }
-    .bg-poster-row.reverse {
-      animation-name: bg-scroll-right;
-    }
-    .bg-poster-row img {
-      width: 150px;
-      height: 225px;
+    /* Site-wide full-screen poster background (behind everything except the
+       media detail page, which already has its own hero backdrop image) —
+       one poster at a time, full-bleed, crossfading to the next. */
+    .bg-fullscreen-poster {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
       object-fit: cover;
-      border-radius: 0.75rem;
-      flex: 0 0 auto;
+      transition: opacity 2s ease-in-out;
+    }
+    .bg-fade-enter-active, .bg-fade-leave-active {
+      transition: opacity 2s ease-in-out;
+    }
+    .bg-fade-enter-from, .bg-fade-leave-to {
+      opacity: 0;
     }
   </style>
 </head>
@@ -195,21 +186,13 @@
 
   <div id="app" class="flex-1 flex flex-col">
 
-    <!-- Site-wide scrolling poster background, hidden only on the media detail
+    <!-- Site-wide full-screen poster background, hidden only on the media detail
          page (it already has its own hero backdrop). Sits behind every route. -->
     <div v-if="currentRoute !== 'media'" class="fixed inset-0 z-0 overflow-hidden pointer-events-none select-none" aria-hidden="true">
+      <Transition name="bg-fade">
+        <img v-if="currentBgPoster" :key="currentBgPoster" :src="currentBgPoster" loading="lazy" alt="" class="bg-fullscreen-poster" />
+      </Transition>
       <div class="absolute inset-0 bg-darkBg/85"></div>
-      <div class="absolute inset-0 flex flex-col justify-around opacity-20">
-        <div v-if="backgroundPosters.length > 0" class="bg-poster-row">
-          <img v-for="(src, idx) in [...backgroundPosters, ...backgroundPosters]" :key="'bgrow1-' + idx" :src="src" loading="lazy" alt="" />
-        </div>
-        <div v-if="backgroundPosters.length > 0" class="bg-poster-row reverse">
-          <img v-for="(src, idx) in [...backgroundPosters.slice().reverse(), ...backgroundPosters.slice().reverse()]" :key="'bgrow2-' + idx" :src="src" loading="lazy" alt="" />
-        </div>
-        <div v-if="backgroundPosters.length > 0" class="bg-poster-row">
-          <img v-for="(src, idx) in [...backgroundPosters, ...backgroundPosters]" :key="'bgrow3-' + idx" :src="src" loading="lazy" alt="" />
-        </div>
-      </div>
     </div>
 
     <!-- HEADER GLOBAL PERSISTANT (toujours visible sur toutes les vues) -->
@@ -2093,13 +2076,27 @@
         const topRatedSeries = ref([]);
         const isLoadingHome = ref(false);
 
-        // Pool of poster images for the site-wide scrolling background —
-        // reuses whatever the Home sections already fetched, no extra calls.
+        // Pool of poster images for the site-wide background — reuses whatever
+        // the Home sections already fetched, no extra calls.
         const backgroundPosters = computed(() => {
           const pools = [trendingHome.value, recentMovies.value, recentSeries.value, recentAnime.value, recentKdrama.value, topRatedMovies.value, topRatedSeries.value];
           const all = pools.flat().map(i => i.posterPath).filter(Boolean);
           return [...new Set(all)].slice(0, 24);
         });
+
+        // Cycles the full-screen background through one poster at a time
+        const bgPosterIndex = ref(0);
+        const currentBgPoster = computed(() => {
+          if (backgroundPosters.value.length === 0) return null;
+          return backgroundPosters.value[bgPosterIndex.value % backgroundPosters.value.length];
+        });
+        let bgPosterTimer = null;
+        const startBgPosterCycle = () => {
+          if (bgPosterTimer) return;
+          bgPosterTimer = setInterval(() => {
+            if (backgroundPosters.value.length > 0) bgPosterIndex.value++;
+          }, 8000);
+        };
 
         const isSearching = ref(false);
         const isLoadingMore = ref(false);
@@ -3797,6 +3794,8 @@
         });
 
         onMounted(() => {
+          startBgPosterCycle();
+
           window.addEventListener('beforeinstallprompt', (e) => {
             e.preventDefault();
             deferredPrompt.value = e;
@@ -3877,6 +3876,7 @@
           topRatedSeries,
           isLoadingHome,
           backgroundPosters,
+          currentBgPoster,
           sagaCollections,
           isLoadingSagaCollections,
           selectedSagaCollection,
