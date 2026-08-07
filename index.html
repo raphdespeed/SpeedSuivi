@@ -1460,9 +1460,10 @@
               >
                 Annuler
               </button>
-              <button 
+              <button
                 @click="saveModalChanges"
-                class="text-xs font-heading font-bold px-6 py-2.5 rounded-xl bg-netflixRed hover:bg-netflixRedHover text-white shadow-lg shadow-netflixRed/30 transition-all flex items-center gap-2"
+                :disabled="!modalStatus"
+                :class="['text-xs font-heading font-bold px-6 py-2.5 rounded-xl text-white transition-all flex items-center gap-2', modalStatus ? 'bg-netflixRed hover:bg-netflixRedHover shadow-lg shadow-netflixRed/30' : 'bg-white/10 opacity-50 cursor-not-allowed']"
               >
                 <span>💾</span> <span>Enregistrer les modifications</span>
               </button>
@@ -2548,7 +2549,7 @@
           saveScrollPosition();
           selectedPerson.value = null;
           selectedMedia.value = item;
-          modalStatus.value = item.status || 'in_progress';
+          modalStatus.value = item.status || null;
           modalSeason.value = item.currentSeason || 1;
           modalEpisode.value = item.currentEpisode || 0;
           
@@ -3598,6 +3599,10 @@
 
         const saveModalChanges = () => {
           if (!selectedMedia.value) return;
+          if (!modalStatus.value) {
+            showToast('Choisis un statut (En cours, À voir, Terminé...) avant d\'enregistrer', 'info');
+            return;
+          }
           saveItem(selectedMedia.value, modalStatus.value, {
             currentSeason: modalSeason.value,
             currentEpisode: modalEpisode.value
