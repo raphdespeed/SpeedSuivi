@@ -2032,11 +2032,11 @@
       >&times;</button>
 
       <button
-        @click.stop="downloadLightboxImage"
+        @click.stop="openLightboxImageFullSize"
         class="absolute top-6 left-6 z-10 h-12 px-4 rounded-full bg-black/80 hover:bg-netflixRed text-white text-xs font-heading font-bold flex items-center gap-2 transition-colors border border-white/20 shadow-2xl cursor-pointer"
-        title="Ouvre l'image dans un nouvel onglet — clic droit puis « Enregistrer l'image sous... » pour la télécharger"
+        title="Ouvre l'image en plein format dans un nouvel onglet"
       >
-        <span>⬇️</span> <span class="hidden sm:inline">Télécharger</span>
+        <span>🔍</span> <span class="hidden sm:inline">Agrandir</span>
       </button>
 
       <!-- Prev/Next Navigation Across the Whole Photo Gallery -->
@@ -2836,7 +2836,7 @@
         // real one-click download is not possible; a cross-origin <a download> link is
         // also silently ignored by Chrome/Brave and just navigates instead. Opening in a
         // new tab is the one approach that reliably works everywhere.
-        const downloadLightboxImage = () => {
+        const openLightboxImageFullSize = () => {
           if (!activeLightboxImage.value) return;
           window.open(activeLightboxImage.value, '_blank', 'noopener');
         };
@@ -4074,7 +4074,7 @@
           isLoadingPerson,
           showFullBio,
           activeLightboxImage,
-          downloadLightboxImage,
+          openLightboxImageFullSize,
           modalStatus,
           modalSeason,
           modalEpisode,
