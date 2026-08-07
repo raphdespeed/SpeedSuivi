@@ -2299,8 +2299,21 @@
         // a background silent reconnect must NOT auto-dismiss it, or it can flash and vanish
         // before the user has any chance to see it.
         const showDriveDisconnectHint = ref(false);
+        const driveInitSettled = ref(false);
+
         watch(() => driveSyncState.value.isConnected, (isConnected, wasConnected) => {
           if (wasConnected && !isConnected) {
+            showDriveDisconnectHint.value = true;
+          }
+        });
+
+        // Also covers "already disconnected on page load" (e.g. the token expired while
+        // the tab was closed): driveSyncState.user is only ever populated once someone has
+        // connected before, so still having it while disconnected means a real, involuntary
+        // drop - not a user who never set up Drive sync. Waits past the silent-reconnect
+        // attempt's own timeout so a successful background reconnect never needlessly nags.
+        watch(driveInitSettled, (settled) => {
+          if (settled && !driveSyncState.value.isConnected && driveSyncState.value.user) {
             showDriveDisconnectHint.value = true;
           }
         });
@@ -3833,6 +3846,7 @@
               showToast('Données synchronisées avec Google Drive ! ☁️', 'success');
             }
           );
+          setTimeout(() => { driveInitSettled.value = true; }, 5500);
 
           loadCollection();
           fetchRecentReleases();
