@@ -2913,6 +2913,7 @@
           if (existingIndex >= 0) {
             const currentFav = !!collection.value[existingIndex].isFavorite;
             collection.value[existingIndex].isFavorite = !currentFav;
+            collection.value[existingIndex].updatedAt = new Date().toISOString();
             if (item) item.isFavorite = !currentFav;
 
             saveCollection();
