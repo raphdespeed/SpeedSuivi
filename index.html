@@ -497,8 +497,13 @@
                 <div class="p-3 flex flex-col flex-1">
                   <h4 class="font-heading font-bold text-sm text-white line-clamp-2 mb-2 leading-snug" :title="item.title">{{ item.title }}</h4>
                   <div class="mt-auto pt-2 flex gap-1.5">
-                    <button @click.stop="saveItem(item, 'in_progress')" class="flex-1 text-[11px] font-heading font-bold py-1 bg-netflixRed hover:bg-netflixRedHover text-white rounded-lg transition-colors">+ En cours</button>
-                    <button @click.stop="saveItem(item, 'watchlist')" class="flex-1 text-[11px] font-heading font-bold py-1 bg-traktPurple hover:opacity-90 text-white rounded-lg transition-colors">+ À voir</button>
+                    <button v-if="getItemStatus(item) === 'in_progress'" @click.stop="openModal(item)" class="w-full text-[11px] font-heading font-bold py-1 px-2 rounded-lg bg-netflixRed/20 text-netflixRed border border-netflixRed/40 text-center">✓ En cours<span v-if="isFavoriteItem(item.id)"> 🔄</span></button>
+                    <button v-else-if="getItemStatus(item) === 'watchlist'" @click.stop="openModal(item)" class="w-full text-[11px] font-heading font-bold py-1 px-2 rounded-lg bg-traktPurple/20 text-traktPurple border border-traktPurple/40 text-center">✓ À voir<span v-if="isFavoriteItem(item.id)"> 🔄</span></button>
+                    <button v-else-if="getItemStatus(item) === 'completed'" @click.stop="openModal(item)" class="w-full text-[11px] font-heading font-bold py-1 px-2 rounded-lg bg-successGreen/20 text-successGreen border border-successGreen/40 text-center">✓ Terminé<span v-if="isFavoriteItem(item.id)"> 🔄</span></button>
+                    <template v-else>
+                      <button @click.stop="saveItem(item, 'in_progress')" class="flex-1 text-[11px] font-heading font-bold py-1 bg-netflixRed hover:bg-netflixRedHover text-white rounded-lg transition-colors">+ En cours</button>
+                      <button @click.stop="saveItem(item, 'watchlist')" class="flex-1 text-[11px] font-heading font-bold py-1 bg-traktPurple hover:opacity-90 text-white rounded-lg transition-colors">+ À voir</button>
+                    </template>
                   </div>
                 </div>
               </div>
@@ -527,8 +532,13 @@
                 <div class="p-3 flex flex-col flex-1">
                   <h4 class="font-heading font-bold text-sm text-white line-clamp-2 mb-2 leading-snug" :title="item.title">{{ item.title }}</h4>
                   <div class="mt-auto pt-2 flex gap-1.5">
-                    <button @click.stop="saveItem(item, 'in_progress')" class="flex-1 text-[11px] font-heading font-bold py-1 bg-netflixRed hover:bg-netflixRedHover text-white rounded-lg transition-colors">+ En cours</button>
-                    <button @click.stop="saveItem(item, 'watchlist')" class="flex-1 text-[11px] font-heading font-bold py-1 bg-traktPurple hover:opacity-90 text-white rounded-lg transition-colors">+ À voir</button>
+                    <button v-if="getItemStatus(item) === 'in_progress'" @click.stop="openModal(item)" class="w-full text-[11px] font-heading font-bold py-1 px-2 rounded-lg bg-netflixRed/20 text-netflixRed border border-netflixRed/40 text-center">✓ En cours<span v-if="isFavoriteItem(item.id)"> 🔄</span></button>
+                    <button v-else-if="getItemStatus(item) === 'watchlist'" @click.stop="openModal(item)" class="w-full text-[11px] font-heading font-bold py-1 px-2 rounded-lg bg-traktPurple/20 text-traktPurple border border-traktPurple/40 text-center">✓ À voir<span v-if="isFavoriteItem(item.id)"> 🔄</span></button>
+                    <button v-else-if="getItemStatus(item) === 'completed'" @click.stop="openModal(item)" class="w-full text-[11px] font-heading font-bold py-1 px-2 rounded-lg bg-successGreen/20 text-successGreen border border-successGreen/40 text-center">✓ Terminé<span v-if="isFavoriteItem(item.id)"> 🔄</span></button>
+                    <template v-else>
+                      <button @click.stop="saveItem(item, 'in_progress')" class="flex-1 text-[11px] font-heading font-bold py-1 bg-netflixRed hover:bg-netflixRedHover text-white rounded-lg transition-colors">+ En cours</button>
+                      <button @click.stop="saveItem(item, 'watchlist')" class="flex-1 text-[11px] font-heading font-bold py-1 bg-traktPurple hover:opacity-90 text-white rounded-lg transition-colors">+ À voir</button>
+                    </template>
                   </div>
                 </div>
               </div>
@@ -557,8 +567,13 @@
                 <div class="p-3 flex flex-col flex-1">
                   <h4 class="font-heading font-bold text-sm text-white line-clamp-2 mb-2 leading-snug" :title="item.title">{{ item.title }}</h4>
                   <div class="mt-auto pt-2 flex gap-1.5">
-                    <button @click.stop="saveItem(item, 'in_progress')" class="flex-1 text-[11px] font-heading font-bold py-1 bg-netflixRed hover:bg-netflixRedHover text-white rounded-lg transition-colors">+ En cours</button>
-                    <button @click.stop="saveItem(item, 'watchlist')" class="flex-1 text-[11px] font-heading font-bold py-1 bg-traktPurple hover:opacity-90 text-white rounded-lg transition-colors">+ À voir</button>
+                    <button v-if="getItemStatus(item) === 'in_progress'" @click.stop="openModal(item)" class="w-full text-[11px] font-heading font-bold py-1 px-2 rounded-lg bg-netflixRed/20 text-netflixRed border border-netflixRed/40 text-center">✓ En cours<span v-if="isFavoriteItem(item.id)"> 🔄</span></button>
+                    <button v-else-if="getItemStatus(item) === 'watchlist'" @click.stop="openModal(item)" class="w-full text-[11px] font-heading font-bold py-1 px-2 rounded-lg bg-traktPurple/20 text-traktPurple border border-traktPurple/40 text-center">✓ À voir<span v-if="isFavoriteItem(item.id)"> 🔄</span></button>
+                    <button v-else-if="getItemStatus(item) === 'completed'" @click.stop="openModal(item)" class="w-full text-[11px] font-heading font-bold py-1 px-2 rounded-lg bg-successGreen/20 text-successGreen border border-successGreen/40 text-center">✓ Terminé<span v-if="isFavoriteItem(item.id)"> 🔄</span></button>
+                    <template v-else>
+                      <button @click.stop="saveItem(item, 'in_progress')" class="flex-1 text-[11px] font-heading font-bold py-1 bg-netflixRed hover:bg-netflixRedHover text-white rounded-lg transition-colors">+ En cours</button>
+                      <button @click.stop="saveItem(item, 'watchlist')" class="flex-1 text-[11px] font-heading font-bold py-1 bg-traktPurple hover:opacity-90 text-white rounded-lg transition-colors">+ À voir</button>
+                    </template>
                   </div>
                 </div>
               </div>
@@ -587,8 +602,13 @@
                 <div class="p-3 flex flex-col flex-1">
                   <h4 class="font-heading font-bold text-sm text-white line-clamp-2 mb-2 leading-snug" :title="item.title">{{ item.title }}</h4>
                   <div class="mt-auto pt-2 flex gap-1.5">
-                    <button @click.stop="saveItem(item, 'in_progress')" class="flex-1 text-[11px] font-heading font-bold py-1 bg-netflixRed hover:bg-netflixRedHover text-white rounded-lg transition-colors">+ En cours</button>
-                    <button @click.stop="saveItem(item, 'watchlist')" class="flex-1 text-[11px] font-heading font-bold py-1 bg-traktPurple hover:opacity-90 text-white rounded-lg transition-colors">+ À voir</button>
+                    <button v-if="getItemStatus(item) === 'in_progress'" @click.stop="openModal(item)" class="w-full text-[11px] font-heading font-bold py-1 px-2 rounded-lg bg-netflixRed/20 text-netflixRed border border-netflixRed/40 text-center">✓ En cours<span v-if="isFavoriteItem(item.id)"> 🔄</span></button>
+                    <button v-else-if="getItemStatus(item) === 'watchlist'" @click.stop="openModal(item)" class="w-full text-[11px] font-heading font-bold py-1 px-2 rounded-lg bg-traktPurple/20 text-traktPurple border border-traktPurple/40 text-center">✓ À voir<span v-if="isFavoriteItem(item.id)"> 🔄</span></button>
+                    <button v-else-if="getItemStatus(item) === 'completed'" @click.stop="openModal(item)" class="w-full text-[11px] font-heading font-bold py-1 px-2 rounded-lg bg-successGreen/20 text-successGreen border border-successGreen/40 text-center">✓ Terminé<span v-if="isFavoriteItem(item.id)"> 🔄</span></button>
+                    <template v-else>
+                      <button @click.stop="saveItem(item, 'in_progress')" class="flex-1 text-[11px] font-heading font-bold py-1 bg-netflixRed hover:bg-netflixRedHover text-white rounded-lg transition-colors">+ En cours</button>
+                      <button @click.stop="saveItem(item, 'watchlist')" class="flex-1 text-[11px] font-heading font-bold py-1 bg-traktPurple hover:opacity-90 text-white rounded-lg transition-colors">+ À voir</button>
+                    </template>
                   </div>
                 </div>
               </div>
@@ -617,8 +637,13 @@
                 <div class="p-3 flex flex-col flex-1">
                   <h4 class="font-heading font-bold text-sm text-white line-clamp-2 mb-2 leading-snug" :title="item.title">{{ item.title }}</h4>
                   <div class="mt-auto pt-2 flex gap-1.5">
-                    <button @click.stop="saveItem(item, 'in_progress')" class="flex-1 text-[11px] font-heading font-bold py-1 bg-netflixRed hover:bg-netflixRedHover text-white rounded-lg transition-colors">+ En cours</button>
-                    <button @click.stop="saveItem(item, 'watchlist')" class="flex-1 text-[11px] font-heading font-bold py-1 bg-traktPurple hover:opacity-90 text-white rounded-lg transition-colors">+ À voir</button>
+                    <button v-if="getItemStatus(item) === 'in_progress'" @click.stop="openModal(item)" class="w-full text-[11px] font-heading font-bold py-1 px-2 rounded-lg bg-netflixRed/20 text-netflixRed border border-netflixRed/40 text-center">✓ En cours<span v-if="isFavoriteItem(item.id)"> 🔄</span></button>
+                    <button v-else-if="getItemStatus(item) === 'watchlist'" @click.stop="openModal(item)" class="w-full text-[11px] font-heading font-bold py-1 px-2 rounded-lg bg-traktPurple/20 text-traktPurple border border-traktPurple/40 text-center">✓ À voir<span v-if="isFavoriteItem(item.id)"> 🔄</span></button>
+                    <button v-else-if="getItemStatus(item) === 'completed'" @click.stop="openModal(item)" class="w-full text-[11px] font-heading font-bold py-1 px-2 rounded-lg bg-successGreen/20 text-successGreen border border-successGreen/40 text-center">✓ Terminé<span v-if="isFavoriteItem(item.id)"> 🔄</span></button>
+                    <template v-else>
+                      <button @click.stop="saveItem(item, 'in_progress')" class="flex-1 text-[11px] font-heading font-bold py-1 bg-netflixRed hover:bg-netflixRedHover text-white rounded-lg transition-colors">+ En cours</button>
+                      <button @click.stop="saveItem(item, 'watchlist')" class="flex-1 text-[11px] font-heading font-bold py-1 bg-traktPurple hover:opacity-90 text-white rounded-lg transition-colors">+ À voir</button>
+                    </template>
                   </div>
                 </div>
               </div>
@@ -647,8 +672,13 @@
                 <div class="p-3 flex flex-col flex-1">
                   <h4 class="font-heading font-bold text-sm text-white line-clamp-2 mb-2 leading-snug" :title="item.title">{{ item.title }}</h4>
                   <div class="mt-auto pt-2 flex gap-1.5">
-                    <button @click.stop="saveItem(item, 'in_progress')" class="flex-1 text-[11px] font-heading font-bold py-1 bg-netflixRed hover:bg-netflixRedHover text-white rounded-lg transition-colors">+ En cours</button>
-                    <button @click.stop="saveItem(item, 'watchlist')" class="flex-1 text-[11px] font-heading font-bold py-1 bg-traktPurple hover:opacity-90 text-white rounded-lg transition-colors">+ À voir</button>
+                    <button v-if="getItemStatus(item) === 'in_progress'" @click.stop="openModal(item)" class="w-full text-[11px] font-heading font-bold py-1 px-2 rounded-lg bg-netflixRed/20 text-netflixRed border border-netflixRed/40 text-center">✓ En cours<span v-if="isFavoriteItem(item.id)"> 🔄</span></button>
+                    <button v-else-if="getItemStatus(item) === 'watchlist'" @click.stop="openModal(item)" class="w-full text-[11px] font-heading font-bold py-1 px-2 rounded-lg bg-traktPurple/20 text-traktPurple border border-traktPurple/40 text-center">✓ À voir<span v-if="isFavoriteItem(item.id)"> 🔄</span></button>
+                    <button v-else-if="getItemStatus(item) === 'completed'" @click.stop="openModal(item)" class="w-full text-[11px] font-heading font-bold py-1 px-2 rounded-lg bg-successGreen/20 text-successGreen border border-successGreen/40 text-center">✓ Terminé<span v-if="isFavoriteItem(item.id)"> 🔄</span></button>
+                    <template v-else>
+                      <button @click.stop="saveItem(item, 'in_progress')" class="flex-1 text-[11px] font-heading font-bold py-1 bg-netflixRed hover:bg-netflixRedHover text-white rounded-lg transition-colors">+ En cours</button>
+                      <button @click.stop="saveItem(item, 'watchlist')" class="flex-1 text-[11px] font-heading font-bold py-1 bg-traktPurple hover:opacity-90 text-white rounded-lg transition-colors">+ À voir</button>
+                    </template>
                   </div>
                 </div>
               </div>
@@ -677,8 +707,13 @@
                 <div class="p-3 flex flex-col flex-1">
                   <h4 class="font-heading font-bold text-sm text-white line-clamp-2 mb-2 leading-snug" :title="item.title">{{ item.title }}</h4>
                   <div class="mt-auto pt-2 flex gap-1.5">
-                    <button @click.stop="saveItem(item, 'in_progress')" class="flex-1 text-[11px] font-heading font-bold py-1 bg-netflixRed hover:bg-netflixRedHover text-white rounded-lg transition-colors">+ En cours</button>
-                    <button @click.stop="saveItem(item, 'watchlist')" class="flex-1 text-[11px] font-heading font-bold py-1 bg-traktPurple hover:opacity-90 text-white rounded-lg transition-colors">+ À voir</button>
+                    <button v-if="getItemStatus(item) === 'in_progress'" @click.stop="openModal(item)" class="w-full text-[11px] font-heading font-bold py-1 px-2 rounded-lg bg-netflixRed/20 text-netflixRed border border-netflixRed/40 text-center">✓ En cours<span v-if="isFavoriteItem(item.id)"> 🔄</span></button>
+                    <button v-else-if="getItemStatus(item) === 'watchlist'" @click.stop="openModal(item)" class="w-full text-[11px] font-heading font-bold py-1 px-2 rounded-lg bg-traktPurple/20 text-traktPurple border border-traktPurple/40 text-center">✓ À voir<span v-if="isFavoriteItem(item.id)"> 🔄</span></button>
+                    <button v-else-if="getItemStatus(item) === 'completed'" @click.stop="openModal(item)" class="w-full text-[11px] font-heading font-bold py-1 px-2 rounded-lg bg-successGreen/20 text-successGreen border border-successGreen/40 text-center">✓ Terminé<span v-if="isFavoriteItem(item.id)"> 🔄</span></button>
+                    <template v-else>
+                      <button @click.stop="saveItem(item, 'in_progress')" class="flex-1 text-[11px] font-heading font-bold py-1 bg-netflixRed hover:bg-netflixRedHover text-white rounded-lg transition-colors">+ En cours</button>
+                      <button @click.stop="saveItem(item, 'watchlist')" class="flex-1 text-[11px] font-heading font-bold py-1 bg-traktPurple hover:opacity-90 text-white rounded-lg transition-colors">+ À voir</button>
+                    </template>
                   </div>
                 </div>
               </div>
@@ -1010,18 +1045,35 @@
               <div class="p-3 flex flex-col flex-1">
                 <h3 class="font-heading font-bold text-sm text-white line-clamp-2 mb-2 leading-snug" :title="item.title">{{ item.title }}</h3>
                 <div class="mt-auto pt-2 flex gap-1.5">
-                  <button 
-                    @click="saveItem(item, 'in_progress')"
-                    class="flex-1 text-xs font-heading font-bold py-1.5 bg-netflixRed hover:bg-netflixRedHover text-white rounded-lg transition-colors"
-                  >
-                    + En cours
-                  </button>
-                  <button 
-                    @click="saveItem(item, 'watchlist')"
-                    class="flex-1 text-xs font-heading font-bold py-1.5 bg-traktPurple hover:opacity-90 text-white rounded-lg transition-colors"
-                  >
-                    + À voir
-                  </button>
+                  <button
+                    v-if="getItemStatus(item) === 'in_progress'"
+                    @click.stop="openModal(item)"
+                    class="w-full text-xs font-heading font-bold py-1.5 px-2 rounded-lg bg-netflixRed/20 text-netflixRed border border-netflixRed/40 text-center"
+                  >✓ En cours<span v-if="isFavoriteItem(item.id)"> 🔄</span></button>
+                  <button
+                    v-else-if="getItemStatus(item) === 'watchlist'"
+                    @click.stop="openModal(item)"
+                    class="w-full text-xs font-heading font-bold py-1.5 px-2 rounded-lg bg-traktPurple/20 text-traktPurple border border-traktPurple/40 text-center"
+                  >✓ À voir<span v-if="isFavoriteItem(item.id)"> 🔄</span></button>
+                  <button
+                    v-else-if="getItemStatus(item) === 'completed'"
+                    @click.stop="openModal(item)"
+                    class="w-full text-xs font-heading font-bold py-1.5 px-2 rounded-lg bg-successGreen/20 text-successGreen border border-successGreen/40 text-center"
+                  >✓ Terminé<span v-if="isFavoriteItem(item.id)"> 🔄</span></button>
+                  <template v-else>
+                    <button
+                      @click="saveItem(item, 'in_progress')"
+                      class="flex-1 text-xs font-heading font-bold py-1.5 bg-netflixRed hover:bg-netflixRedHover text-white rounded-lg transition-colors"
+                    >
+                      + En cours
+                    </button>
+                    <button
+                      @click="saveItem(item, 'watchlist')"
+                      class="flex-1 text-xs font-heading font-bold py-1.5 bg-traktPurple hover:opacity-90 text-white rounded-lg transition-colors"
+                    >
+                      + À voir
+                    </button>
+                  </template>
                 </div>
               </div>
             </div>
@@ -1851,8 +1903,13 @@
                 <div class="p-3 flex flex-col flex-1">
                   <h4 class="font-heading font-bold text-sm text-white line-clamp-2 leading-snug group-hover:text-netflixRed transition-colors mb-2" :title="item.title">{{ item.title }}</h4>
                   <div class="mt-auto pt-2 flex gap-1.5">
-                    <button @click.stop="saveItem(item, 'in_progress')" class="flex-1 text-[11px] font-heading font-bold py-1 bg-netflixRed hover:bg-netflixRedHover text-white rounded-lg transition-colors">+ En cours</button>
-                    <button @click.stop="saveItem(item, 'watchlist')" class="flex-1 text-[11px] font-heading font-bold py-1 bg-traktPurple hover:opacity-90 text-white rounded-lg transition-colors">+ À voir</button>
+                    <button v-if="getItemStatus(item) === 'in_progress'" @click.stop="openModal(item)" class="w-full text-[11px] font-heading font-bold py-1 px-2 rounded-lg bg-netflixRed/20 text-netflixRed border border-netflixRed/40 text-center">✓ En cours<span v-if="isFavoriteItem(item.id)"> 🔄</span></button>
+                    <button v-else-if="getItemStatus(item) === 'watchlist'" @click.stop="openModal(item)" class="w-full text-[11px] font-heading font-bold py-1 px-2 rounded-lg bg-traktPurple/20 text-traktPurple border border-traktPurple/40 text-center">✓ À voir<span v-if="isFavoriteItem(item.id)"> 🔄</span></button>
+                    <button v-else-if="getItemStatus(item) === 'completed'" @click.stop="openModal(item)" class="w-full text-[11px] font-heading font-bold py-1 px-2 rounded-lg bg-successGreen/20 text-successGreen border border-successGreen/40 text-center">✓ Terminé<span v-if="isFavoriteItem(item.id)"> 🔄</span></button>
+                    <template v-else>
+                      <button @click.stop="saveItem(item, 'in_progress')" class="flex-1 text-[11px] font-heading font-bold py-1 bg-netflixRed hover:bg-netflixRedHover text-white rounded-lg transition-colors">+ En cours</button>
+                      <button @click.stop="saveItem(item, 'watchlist')" class="flex-1 text-[11px] font-heading font-bold py-1 bg-traktPurple hover:opacity-90 text-white rounded-lg transition-colors">+ À voir</button>
+                    </template>
                   </div>
                 </div>
               </div>
@@ -1944,8 +2001,13 @@
                 <div class="p-3 flex flex-col flex-1">
                   <h4 class="font-heading font-bold text-sm text-white line-clamp-2 mb-2 leading-snug" :title="item.title">{{ item.title }}</h4>
                   <div class="mt-auto pt-2 flex gap-1.5">
-                    <button @click.stop="saveItem(item, 'in_progress')" class="flex-1 text-[11px] font-heading font-bold py-1 bg-netflixRed hover:bg-netflixRedHover text-white rounded-lg transition-colors">+ En cours</button>
-                    <button @click.stop="saveItem(item, 'watchlist')" class="flex-1 text-[11px] font-heading font-bold py-1 bg-traktPurple hover:opacity-90 text-white rounded-lg transition-colors">+ À voir</button>
+                    <button v-if="getItemStatus(item) === 'in_progress'" @click.stop="openModal(item)" class="w-full text-[11px] font-heading font-bold py-1 px-2 rounded-lg bg-netflixRed/20 text-netflixRed border border-netflixRed/40 text-center">✓ En cours<span v-if="isFavoriteItem(item.id)"> 🔄</span></button>
+                    <button v-else-if="getItemStatus(item) === 'watchlist'" @click.stop="openModal(item)" class="w-full text-[11px] font-heading font-bold py-1 px-2 rounded-lg bg-traktPurple/20 text-traktPurple border border-traktPurple/40 text-center">✓ À voir<span v-if="isFavoriteItem(item.id)"> 🔄</span></button>
+                    <button v-else-if="getItemStatus(item) === 'completed'" @click.stop="openModal(item)" class="w-full text-[11px] font-heading font-bold py-1 px-2 rounded-lg bg-successGreen/20 text-successGreen border border-successGreen/40 text-center">✓ Terminé<span v-if="isFavoriteItem(item.id)"> 🔄</span></button>
+                    <template v-else>
+                      <button @click.stop="saveItem(item, 'in_progress')" class="flex-1 text-[11px] font-heading font-bold py-1 bg-netflixRed hover:bg-netflixRedHover text-white rounded-lg transition-colors">+ En cours</button>
+                      <button @click.stop="saveItem(item, 'watchlist')" class="flex-1 text-[11px] font-heading font-bold py-1 bg-traktPurple hover:opacity-90 text-white rounded-lg transition-colors">+ À voir</button>
+                    </template>
                   </div>
                 </div>
               </div>
