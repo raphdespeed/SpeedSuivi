@@ -2642,6 +2642,14 @@
                 restoreScrollPosition();
                 return;
               }
+              if (selectedMedia.value && selectedMedia.value.id === mediaId) {
+                // Already viewing this item - this hashchange is just openMediaDetail's own
+                // hash update echoing back. Re-opening from a stale collection.value entry
+                // here would race the in-flight fetchExtendedMediaDetails call and could
+                // revert an already-resolved field (e.g. a localized title) back to its
+                // untranslated value.
+                return;
+              }
               const foundInCol = collection.value.find(i => i.id === mediaId);
               if (foundInCol) {
                 openMediaDetail(foundInCol, false);
@@ -2904,6 +2912,27 @@
           return currentName;
         };
 
+        // Same idea as resolveLocalizedTitle but for the poster: TMDB posters are tagged by
+        // language (text overlaid on the art, or no language for a textless/international
+        // one). The request already asks for images.posters filtered to include_image_language
+        // fr,null,en, so any entry present there is already acceptable - if the poster_path
+        // TMDB picked as "the" poster isn't among them, it must be some other (e.g. native
+        // script) language that got filtered out, so swap to the best fr > en > textless
+        // option instead. Free: this reuses data already fetched via append_to_response=images.
+        const resolveLocalizedPoster = (data) => {
+          const currentPath = data.poster_path;
+          const posters = data.images?.posters || [];
+          if (!currentPath || posters.length === 0) return currentPath;
+          if (posters.some(p => p.file_path === currentPath)) return currentPath;
+
+          const bestOf = (lang) => posters
+            .filter(p => p.iso_639_1 === lang)
+            .sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0))[0];
+
+          const preferred = bestOf('fr') || bestOf('en') || bestOf(null);
+          return preferred ? preferred.file_path : currentPath;
+        };
+
         const fetchExtendedMediaDetails = async (item) => {
           try {
             const type = item.mediaType === 'movie' ? 'movie' : 'tv';
@@ -2934,10 +2963,12 @@
 
             const resolvedTitle = await resolveLocalizedTitle(data, type);
             if (type === 'movie') data.title = resolvedTitle; else data.name = resolvedTitle;
+            data.poster_path = resolveLocalizedPoster(data);
 
             const formatted = formatItem({ ...data, media_type: type });
             if (selectedMedia.value && selectedMedia.value.id === item.id) {
               selectedMedia.value.title = formatted.title;
+              selectedMedia.value.posterPath = formatted.posterPath;
               selectedMedia.value.cast = formatted.cast;
               selectedMedia.value.trailerKey = formatted.trailerKey;
               selectedMedia.value.galleryImages = formatted.galleryImages;
@@ -2952,13 +2983,14 @@
               }
             }
 
-            // Persist the corrected title so it stays fixed everywhere (À voir, Terminés...)
-            // from now on, not just for this viewing.
+            // Persist the corrected title/poster so they stay fixed everywhere (À voir,
+            // Terminés...) from now on, not just for this viewing.
             const titleIdx = collection.value.findIndex(i => i.id === item.id);
-            if (titleIdx >= 0 && collection.value[titleIdx].title !== formatted.title) {
+            if (titleIdx >= 0 && (collection.value[titleIdx].title !== formatted.title || collection.value[titleIdx].posterPath !== formatted.posterPath)) {
               collection.value[titleIdx] = {
                 ...collection.value[titleIdx],
                 title: formatted.title,
+                posterPath: formatted.posterPath,
                 updatedAt: new Date().toISOString()
               };
               saveCollection();
@@ -3045,6 +3077,7 @@
               }
               const resolvedTitle = await resolveLocalizedTitle(raw, typeUrl);
               if (typeUrl === 'movie') raw.title = resolvedTitle; else raw.name = resolvedTitle;
+              raw.poster_path = resolveLocalizedPoster(raw);
               const formatted = formatItem({ ...raw, media_type: typeUrl });
               openMediaDetail(formatted, false);
             }
