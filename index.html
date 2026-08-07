@@ -1455,8 +1455,8 @@
               <span>🗑️</span> <span>Retirer de ma bibliothèque</span>
             </button>
             <div class="ml-auto flex gap-3">
-              <button 
-                @click="closeDetailView"
+              <button
+                @click="cancelModalChanges"
                 class="text-xs font-heading font-semibold px-5 py-2.5 rounded-xl border border-white/10 text-gray-300 hover:bg-white/10"
               >
                 Annuler
@@ -3611,6 +3611,13 @@
           closeDetailView();
         };
 
+        const cancelModalChanges = () => {
+          if (!selectedMedia.value) return;
+          modalStatus.value = selectedMedia.value.status || null;
+          modalSeason.value = selectedMedia.value.currentSeason || 1;
+          modalEpisode.value = selectedMedia.value.currentEpisode || 0;
+        };
+
         const getProgressPercent = (item) => {
           if (item.mediaType === 'movie') {
             return item.status === 'completed' ? 100 : (item.currentEpisode > 0 ? 50 : 0);
@@ -3920,6 +3927,7 @@
           changeStatus,
           removeFromLibrary,
           saveModalChanges,
+          cancelModalChanges,
           getProgressPercent,
           getCategoryBadge,
           getProviderLabel,
