@@ -2031,6 +2031,14 @@
         title="Fermer (Échap)"
       >&times;</button>
 
+      <button
+        @click.stop="downloadLightboxImage"
+        class="absolute top-6 left-6 z-10 h-12 px-4 rounded-full bg-black/80 hover:bg-netflixRed text-white text-xs font-heading font-bold flex items-center gap-2 transition-colors border border-white/20 shadow-2xl cursor-pointer"
+        title="Ouvre l'image dans un nouvel onglet — clic droit puis « Enregistrer l'image sous... » pour la télécharger"
+      >
+        <span>⬇️</span> <span class="hidden sm:inline">Télécharger</span>
+      </button>
+
       <!-- Prev/Next Navigation Across the Whole Photo Gallery -->
       <button
         v-if="lightboxGallery.length > 1"
@@ -2819,6 +2827,18 @@
           activeLightboxImage.value = null;
           lightboxGallery.value = [];
           lightboxIndex.value = 0;
+        };
+
+        // Opens whatever image is currently shown in the lightbox (cover, poster, gallery
+        // photo, actor photo, saga poster...) in a new tab so it can be saved manually.
+        // TMDB's image CDN sends no Access-Control-Allow-Origin header at all (confirmed
+        // via curl - not a local-only CORS quirk), so fetching it as a blob to force a
+        // real one-click download is not possible; a cross-origin <a download> link is
+        // also silently ignored by Chrome/Brave and just navigates instead. Opening in a
+        // new tab is the one approach that reliably works everywhere.
+        const downloadLightboxImage = () => {
+          if (!activeLightboxImage.value) return;
+          window.open(activeLightboxImage.value, '_blank', 'noopener');
         };
 
         const lightboxNext = () => {
@@ -4054,6 +4074,7 @@
           isLoadingPerson,
           showFullBio,
           activeLightboxImage,
+          downloadLightboxImage,
           modalStatus,
           modalSeason,
           modalEpisode,
