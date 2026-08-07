@@ -2892,7 +2892,7 @@
         // unlike TMDB's own website, which then falls back further to the English
         // international title rather than showing native script. This replicates that
         // fallback with one extra lightweight request, only when actually needed.
-        const resolveLocalizedTitle = async (data, type) => {
+        const resolveLocalizedTitle = async (data, type, knownGoodTitle) => {
           const nameField = type === 'movie' ? 'title' : 'name';
           const originalField = type === 'movie' ? 'original_title' : 'original_name';
           const currentName = data[nameField];
@@ -2900,6 +2900,13 @@
           const isUntranslated = currentName && originalName && currentName === originalName;
           const isNonLatinScript = data.original_language && NON_LATIN_SCRIPT_LANGS.includes(data.original_language);
           if (!isUntranslated || !isNonLatinScript) return currentName;
+
+          // Already resolved and saved for this item on a previous visit - reuse it instead
+          // of re-fetching. Skips a redundant request, and avoids a real failure mode: right
+          // after a page reload a burst of other requests (home grids, this same detail page,
+          // Drive sync...) fire at once, and if this "extra" lookup happens to fail under that
+          // load, it would otherwise silently fall back to the native-script title below.
+          if (knownGoodTitle && knownGoodTitle !== originalName) return knownGoodTitle;
 
           try {
             const res = await fetch(`${BASE_URL}/${type}/${data.id}?language=en-US`);
@@ -2961,7 +2968,7 @@
               }
             }
 
-            const resolvedTitle = await resolveLocalizedTitle(data, type);
+            const resolvedTitle = await resolveLocalizedTitle(data, type, item.title);
             if (type === 'movie') data.title = resolvedTitle; else data.name = resolvedTitle;
             data.poster_path = resolveLocalizedPoster(data);
 
