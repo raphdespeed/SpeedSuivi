@@ -2031,14 +2031,6 @@
         title="Fermer (Échap)"
       >&times;</button>
 
-      <button
-        @click.stop="openLightboxImageFullSize"
-        class="absolute top-6 left-6 z-10 h-12 px-4 rounded-full bg-black/80 hover:bg-netflixRed text-white text-xs font-heading font-bold flex items-center gap-2 transition-colors border border-white/20 shadow-2xl cursor-pointer"
-        title="Ouvre l'image en plein format dans un nouvel onglet"
-      >
-        <span>🔍</span> <span class="hidden sm:inline">Agrandir</span>
-      </button>
-
       <!-- Prev/Next Navigation Across the Whole Photo Gallery -->
       <button
         v-if="lightboxGallery.length > 1"
@@ -2829,18 +2821,6 @@
           lightboxIndex.value = 0;
         };
 
-        // Opens whatever image is currently shown in the lightbox (cover, poster, gallery
-        // photo, actor photo, saga poster...) in a new tab so it can be saved manually.
-        // TMDB's image CDN sends no Access-Control-Allow-Origin header at all (confirmed
-        // via curl - not a local-only CORS quirk), so fetching it as a blob to force a
-        // real one-click download is not possible; a cross-origin <a download> link is
-        // also silently ignored by Chrome/Brave and just navigates instead. Opening in a
-        // new tab is the one approach that reliably works everywhere.
-        const openLightboxImageFullSize = () => {
-          if (!activeLightboxImage.value) return;
-          window.open(activeLightboxImage.value, '_blank', 'noopener');
-        };
-
         const lightboxNext = () => {
           if (lightboxGallery.value.length === 0) return;
           lightboxIndex.value = (lightboxIndex.value + 1) % lightboxGallery.value.length;
@@ -2893,6 +2873,37 @@
           restoreScrollPosition();
         };
 
+        // Scripts TMDB has no French title for is where this actually matters - a French
+        // title using Latin script but not French wording (e.g. an English word) is still
+        // readable and left alone.
+        const NON_LATIN_SCRIPT_LANGS = ['ko', 'ja', 'zh', 'th', 'ru', 'ar', 'he', 'hi', 'el', 'ka', 'hy', 'bg', 'uk', 'sr', 'mk', 'mn', 'bn', 'ta', 'te', 'ml', 'kn', 'gu', 'pa', 'ur', 'fa', 'am', 'my', 'km', 'lo', 'si'];
+
+        // TMDB's fr-FR /movie or /tv endpoint silently falls back to the original,
+        // native-script title when it has no French translation for a title (confirmed:
+        // it returns the exact same string as original_name/original_title, not null) -
+        // unlike TMDB's own website, which then falls back further to the English
+        // international title rather than showing native script. This replicates that
+        // fallback with one extra lightweight request, only when actually needed.
+        const resolveLocalizedTitle = async (data, type) => {
+          const nameField = type === 'movie' ? 'title' : 'name';
+          const originalField = type === 'movie' ? 'original_title' : 'original_name';
+          const currentName = data[nameField];
+          const originalName = data[originalField];
+          const isUntranslated = currentName && originalName && currentName === originalName;
+          const isNonLatinScript = data.original_language && NON_LATIN_SCRIPT_LANGS.includes(data.original_language);
+          if (!isUntranslated || !isNonLatinScript) return currentName;
+
+          try {
+            const res = await fetch(`${BASE_URL}/${type}/${data.id}?language=en-US`);
+            if (res.ok) {
+              const enData = await res.json();
+              const enName = enData[nameField];
+              if (enName && enName !== originalName) return enName;
+            }
+          } catch (e) {}
+          return currentName;
+        };
+
         const fetchExtendedMediaDetails = async (item) => {
           try {
             const type = item.mediaType === 'movie' ? 'movie' : 'tv';
@@ -2921,8 +2932,12 @@
               }
             }
 
+            const resolvedTitle = await resolveLocalizedTitle(data, type);
+            if (type === 'movie') data.title = resolvedTitle; else data.name = resolvedTitle;
+
             const formatted = formatItem({ ...data, media_type: type });
             if (selectedMedia.value && selectedMedia.value.id === item.id) {
+              selectedMedia.value.title = formatted.title;
               selectedMedia.value.cast = formatted.cast;
               selectedMedia.value.trailerKey = formatted.trailerKey;
               selectedMedia.value.galleryImages = formatted.galleryImages;
@@ -2935,6 +2950,18 @@
                   selectedMedia.value.totalEpisodes = formatted.seasonsEpisodesMap[modalSeason.value];
                 }
               }
+            }
+
+            // Persist the corrected title so it stays fixed everywhere (À voir, Terminés...)
+            // from now on, not just for this viewing.
+            const titleIdx = collection.value.findIndex(i => i.id === item.id);
+            if (titleIdx >= 0 && collection.value[titleIdx].title !== formatted.title) {
+              collection.value[titleIdx] = {
+                ...collection.value[titleIdx],
+                title: formatted.title,
+                updatedAt: new Date().toISOString()
+              };
+              saveCollection();
             }
 
             // A movie only reveals belongs_to_collection on its own /movie/{id} detail
@@ -3016,6 +3043,8 @@
                   if (vData.results && vData.results.length > 0) raw.videos = vData;
                 } catch (ve) {}
               }
+              const resolvedTitle = await resolveLocalizedTitle(raw, typeUrl);
+              if (typeUrl === 'movie') raw.title = resolvedTitle; else raw.name = resolvedTitle;
               const formatted = formatItem({ ...raw, media_type: typeUrl });
               openMediaDetail(formatted, false);
             }
@@ -4074,7 +4103,6 @@
           isLoadingPerson,
           showFullBio,
           activeLightboxImage,
-          openLightboxImageFullSize,
           modalStatus,
           modalSeason,
           modalEpisode,
