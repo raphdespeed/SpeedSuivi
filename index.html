@@ -1379,23 +1379,24 @@
           </h4>
           
           <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <button 
-              @click="modalStatus = 'in_progress'"
+            <button
+              @click="modalStatus = modalStatus === 'in_progress' ? null : 'in_progress'"
               :class="['py-3 px-4 text-xs font-heading font-bold rounded-xl border transition-all flex items-center justify-center gap-2', modalStatus === 'in_progress' ? 'bg-netflixRed border-netflixRed text-white shadow-lg shadow-netflixRed/30' : 'bg-surfaceBg border-white/10 text-gray-400 hover:text-white hover:bg-white/5']"
             >🚀 En cours</button>
-            <button 
-              @click="modalStatus = 'watchlist'"
+            <button
+              @click="modalStatus = modalStatus === 'watchlist' ? null : 'watchlist'"
               :class="['py-3 px-4 text-xs font-heading font-bold rounded-xl border transition-all flex items-center justify-center gap-2', modalStatus === 'watchlist' ? 'bg-traktPurple border-traktPurple text-white shadow-lg shadow-traktPurple/30' : 'bg-surfaceBg border-white/10 text-gray-400 hover:text-white hover:bg-white/5']"
             >📌 À voir</button>
-            <button 
-              @click="modalStatus = 'completed'"
+            <button
+              @click="modalStatus = modalStatus === 'completed' ? null : 'completed'"
               :class="['py-3 px-4 text-xs font-heading font-bold rounded-xl border transition-all flex items-center justify-center gap-2', modalStatus === 'completed' ? 'bg-successGreen border-successGreen text-black font-bold shadow-lg shadow-successGreen/30' : 'bg-surfaceBg border-white/10 text-gray-400 hover:text-white hover:bg-white/5']"
             >✅ Terminé</button>
-            <button 
-              @click="modalStatus = 'favorites'"
-              :class="['py-3 px-4 text-xs font-heading font-bold rounded-xl border transition-all flex items-center justify-center gap-2', modalStatus === 'favorites' ? 'bg-netflixRed border-netflixRed text-white shadow-lg shadow-netflixRed/30' : 'bg-surfaceBg border-white/10 text-gray-400 hover:text-white hover:bg-white/5']"
+            <button
+              @click="modalStatus = modalStatus === 'favorites' ? null : 'favorites'"
+              :class="['py-3 px-4 text-xs font-heading font-bold rounded-xl border transition-all flex items-center justify-center gap-2', modalStatus === 'favorites' ? 'bg-amber-500 border-amber-500 text-black shadow-lg shadow-amber-500/30' : 'bg-surfaceBg border-white/10 text-gray-400 hover:text-white hover:bg-white/5']"
             >🔄 À revoir</button>
           </div>
+          <p v-if="!modalStatus" class="text-[11px] text-gray-500 -mt-2">Choisis un statut ci-dessus (reclique dessus pour désélectionner).</p>
 
           <!-- Season / Episode Number Inputs -->
           <div v-if="selectedMedia.mediaType !== 'movie'" class="flex flex-wrap gap-6 pt-4 border-t border-white/10 items-center justify-between">
