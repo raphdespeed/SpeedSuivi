@@ -2171,6 +2171,25 @@
         const searchInputRef = ref(null);
         const showBackToTop = ref(false);
 
+        // Persistent cache of resolved title/poster fallbacks (see resolveLocalizedTitle /
+        // resolveLocalizedPoster below), applied in formatItem to ANY item - tracked or not.
+        // Fixing collection.value alone only helps items already added to the user's list;
+        // this is what makes the fix stick for items just being browsed too, without paying
+        // for an extra API call on every render (it's a synchronous in-memory lookup).
+        const TITLE_OVERRIDES_KEY = 'speedsuivi_localized_overrides';
+        let titleOverrides = {};
+        try {
+          titleOverrides = JSON.parse(localStorage.getItem(TITLE_OVERRIDES_KEY) || '{}');
+        } catch (e) {
+          titleOverrides = {};
+        }
+        const saveTitleOverride = (itemId, override) => {
+          titleOverrides[itemId] = override;
+          try {
+            localStorage.setItem(TITLE_OVERRIDES_KEY, JSON.stringify(titleOverrides));
+          } catch (e) {}
+        };
+
         const collection = ref([]);
         const selectedMedia = ref(null);
         const selectedPerson = ref(null);
@@ -2504,11 +2523,12 @@
 
         const formatItem = (raw) => {
           const isMovie = raw.media_type === 'movie' || (!raw.media_type && raw.title);
+          const override = titleOverrides[`${isMovie ? 'movie' : 'tv'}_${raw.id}`];
           const category = detectCategory(raw);
           const releaseDate = raw.release_date || raw.first_air_date || '';
-          const title = raw.title || raw.name || 'Titre inconnu';
+          const title = override?.title || raw.title || raw.name || 'Titre inconnu';
 
-          const posterUrl = raw.poster_path ? `${POSTER_BASE}${raw.poster_path}` : createSvgPlaceholder(title);
+          const posterUrl = override?.posterPath || (raw.poster_path ? `${POSTER_BASE}${raw.poster_path}` : createSvgPlaceholder(title));
           const rawGenreIds = raw.genre_ids || (raw.genres ? raw.genres.map(g => g.id) : []);
 
           // Extract Cast (Top 10 actors/actresses) - Support for TV aggregate_credits
@@ -2968,6 +2988,8 @@
               }
             }
 
+            const rawFrTitle = type === 'movie' ? data.title : data.name;
+            const rawFrPoster = data.poster_path;
             const resolvedTitle = await resolveLocalizedTitle(data, type, item.title);
             if (type === 'movie') data.title = resolvedTitle; else data.name = resolvedTitle;
             data.poster_path = resolveLocalizedPoster(data);
@@ -3001,6 +3023,13 @@
                 updatedAt: new Date().toISOString()
               };
               saveCollection();
+            }
+
+            // Also cache the fix independently of whether the item is tracked, so it stays
+            // fixed everywhere it's shown (trending, discovery, recommendations...) even
+            // across reloads - not just for items already added to the user's list.
+            if (resolvedTitle !== rawFrTitle || data.poster_path !== rawFrPoster) {
+              saveTitleOverride(item.id, { title: formatted.title, posterPath: formatted.posterPath });
             }
 
             // A movie only reveals belongs_to_collection on its own /movie/{id} detail
@@ -3082,10 +3111,15 @@
                   if (vData.results && vData.results.length > 0) raw.videos = vData;
                 } catch (ve) {}
               }
+              const rawFrTitle = typeUrl === 'movie' ? raw.title : raw.name;
+              const rawFrPoster = raw.poster_path;
               const resolvedTitle = await resolveLocalizedTitle(raw, typeUrl);
               if (typeUrl === 'movie') raw.title = resolvedTitle; else raw.name = resolvedTitle;
               raw.poster_path = resolveLocalizedPoster(raw);
               const formatted = formatItem({ ...raw, media_type: typeUrl });
+              if (resolvedTitle !== rawFrTitle || raw.poster_path !== rawFrPoster) {
+                saveTitleOverride(formatted.id, { title: formatted.title, posterPath: formatted.posterPath });
+              }
               openMediaDetail(formatted, false);
             }
           } catch (e) {
