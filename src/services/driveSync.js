@@ -20,6 +20,12 @@ let tokenExpiryTime = 0;
 let driveFileId = null;
 let saveDebounceTimer = null;
 let statusChangeCallback = null;
+let silentRefreshResolver = null;
+let refreshCheckTimer = null;
+
+const SILENT_REFRESH_TIMEOUT_MS = 5000;
+const PROACTIVE_REFRESH_CHECK_MS = 5 * 60 * 1000;
+const PROACTIVE_REFRESH_WINDOW_MS = 10 * 60 * 1000;
 
 export const driveState = {
   isConnected: false,
@@ -111,7 +117,16 @@ function setupTokenClient(onDataReceived, onStatusChange) {
         console.warn('GIS SDK background notice:', err);
       },
       callback: async (response) => {
+        const silentResolve = silentRefreshResolver;
+        silentRefreshResolver = null;
+
         if (response.error) {
+          if (silentResolve) {
+            console.warn(`[DriveSync] Renouvellement silencieux échoué (${response.error}).`);
+            silentResolve(false);
+            return;
+          }
+
           console.warn('OAuth GIS Response error:', response.error);
           driveState.isSyncing = false;
           driveState.isConnected = false;
@@ -148,6 +163,12 @@ function setupTokenClient(onDataReceived, onStatusChange) {
 
         if (onStatusChange) onStatusChange(driveState);
 
+        if (silentResolve) {
+          console.info('[DriveSync] Renouvellement silencieux réussi.');
+          silentResolve(true);
+          return;
+        }
+
         if (onDataReceived) {
           await syncWithDrive(onDataReceived, onStatusChange);
         }
@@ -159,8 +180,71 @@ function setupTokenClient(onDataReceived, onStatusChange) {
 }
 
 /**
- * Proactively check if token is valid (expiresAt > Date.now()).
- * NO silent requestAccessToken({ prompt: '' }) calls to avoid gsiw stuck spinners in Brave/Mobile.
+ * Attempts a silent token renewal (prompt: '') so an open tab can stay connected
+ * for days without a manual reconnect. Bounded by a hard timeout: if GIS doesn't
+ * respond within SILENT_REFRESH_TIMEOUT_MS (browser blocks the silent iframe, no
+ * active Google session, etc.), this gives up cleanly instead of hanging forever —
+ * that hang was exactly the Brave/mobile stuck-spinner regression this used to cause.
+ */
+function attemptSilentRefresh() {
+  return new Promise((resolve) => {
+    if (!tokenClient) {
+      resolve(false);
+      return;
+    }
+
+    let settled = false;
+    const finish = (result) => {
+      if (settled) return;
+      settled = true;
+      resolve(result);
+    };
+
+    silentRefreshResolver = finish;
+
+    setTimeout(() => {
+      if (!settled) {
+        console.warn(`[DriveSync] Renouvellement silencieux : pas de réponse après ${SILENT_REFRESH_TIMEOUT_MS / 1000}s, abandon propre.`);
+        finish(false);
+      }
+    }, SILENT_REFRESH_TIMEOUT_MS);
+
+    try {
+      const cachedUserStr = localStorage.getItem(USER_KEY);
+      let userEmail = driveState.user?.email;
+      if (!userEmail && cachedUserStr) {
+        try { userEmail = JSON.parse(cachedUserStr)?.email; } catch (e) {}
+      }
+      tokenClient.requestAccessToken(userEmail ? { prompt: '', hint: userEmail } : { prompt: '' });
+    } catch (e) {
+      console.error('[DriveSync] Erreur lors du renouvellement silencieux:', e);
+      finish(false);
+    }
+  });
+}
+
+/**
+ * Periodically renews the token in the background, well before it actually expires,
+ * so a tab left open stays connected across days instead of hitting a hard expiry.
+ */
+function scheduleProactiveRefreshCheck() {
+  clearInterval(refreshCheckTimer);
+  refreshCheckTimer = setInterval(async () => {
+    if (!accessToken || !tokenExpiryTime) return;
+    const remainingMs = tokenExpiryTime - Date.now();
+    if (remainingMs > 0 && remainingMs < PROACTIVE_REFRESH_WINDOW_MS) {
+      console.info(`[DriveSync] Renouvellement proactif (encore ${Math.round(remainingMs / 1000)}s avant expiration).`);
+      const ok = await attemptSilentRefresh();
+      if (!ok) {
+        console.warn('[DriveSync] Renouvellement proactif silencieux indisponible pour le moment, nouvelle tentative au prochain contrôle.');
+      }
+    }
+  }, PROACTIVE_REFRESH_CHECK_MS);
+}
+
+/**
+ * Proactively check if token is valid (expiresAt > Date.now()); if not, try a silent
+ * renewal before giving up and asking for a manual reconnect.
  */
 async function ensureValidToken() {
   if (!accessToken) return false;
@@ -170,8 +254,15 @@ async function ensureValidToken() {
     return true;
   }
 
-  // Token expired -> Reset session state cleanly without silent background popups
-  console.warn(`[DriveSync] Token expiré selon l'horloge locale (prévu à ${new Date(tokenExpiryTime).toLocaleTimeString()}, maintenant ${new Date(now).toLocaleTimeString()}) — session effacée.`);
+  console.warn(`[DriveSync] Token expiré selon l'horloge locale (prévu à ${new Date(tokenExpiryTime).toLocaleTimeString()}, maintenant ${new Date(now).toLocaleTimeString()}) — tentative de renouvellement silencieux.`);
+
+  const refreshed = await attemptSilentRefresh();
+  if (refreshed) {
+    console.info('[DriveSync] Session prolongée automatiquement.');
+    return true;
+  }
+
+  console.warn('[DriveSync] Renouvellement silencieux impossible — session effacée, reconnexion manuelle nécessaire.');
   accessToken = null;
   tokenExpiryTime = 0;
   localStorage.removeItem(TOKEN_INFO_KEY);
@@ -186,7 +277,7 @@ async function ensureValidToken() {
  * Only a persistent 401 (token genuinely rejected, confirmed by a retry) clears the session.
  * A 403 (rate limit, quota, permission) never means the token is dead, so it's left untouched.
  */
-async function fetchWithDriveAuth(url, options = {}, isRetry = false) {
+async function fetchWithDriveAuth(url, options = {}, attempt = 0) {
   const isValid = await ensureValidToken();
 
   if (!isValid || !accessToken) {
@@ -205,19 +296,28 @@ async function fetchWithDriveAuth(url, options = {}, isRetry = false) {
     if (response && (response.status === 401 || response.status === 403)) {
       let detail = '';
       try { detail = JSON.stringify(await response.clone().json()); } catch (e) {}
-      console.warn(`[DriveSync] HTTP ${response.status} sur ${url} (retry=${isRetry}): ${detail}`);
+      console.warn(`[DriveSync] HTTP ${response.status} sur ${url} (tentative ${attempt}): ${detail}`);
 
       if (response.status === 403) {
         return response;
       }
 
-      if (!isRetry) {
+      if (attempt === 0) {
         console.warn('[DriveSync] 401 reçu, nouvelle tentative avant de considérer la session morte.');
         await new Promise(r => setTimeout(r, 700));
-        return fetchWithDriveAuth(url, options, true);
+        return fetchWithDriveAuth(url, options, attempt + 1);
       }
 
-      console.warn('[DriveSync] 401 persistant après nouvelle tentative: session effacée.');
+      if (attempt === 1) {
+        console.warn('[DriveSync] 401 persistant — tentative de renouvellement silencieux avant reconnexion manuelle.');
+        const refreshed = await attemptSilentRefresh();
+        if (refreshed) {
+          console.info('[DriveSync] Session prolongée via renouvellement silencieux, nouvelle tentative de la requête.');
+          return fetchWithDriveAuth(url, options, attempt + 1);
+        }
+      }
+
+      console.warn('[DriveSync] Session invalide de façon persistante: session effacée, reconnexion manuelle nécessaire.');
       accessToken = null;
       tokenExpiryTime = 0;
       localStorage.removeItem(TOKEN_INFO_KEY);
@@ -248,6 +348,7 @@ export function initDriveSync(onStatusChange, onDataReceived) {
 
     // 2. Restore cached token if STILL VALID (expiresAt > Date.now())
     const cachedTokenInfoStr = localStorage.getItem(TOKEN_INFO_KEY);
+    let hadExpiredCachedToken = false;
 
     if (cachedTokenInfoStr) {
       try {
@@ -284,9 +385,10 @@ export function initDriveSync(onStatusChange, onDataReceived) {
           // Perform initial sync using valid cached token
           syncWithDrive(onDataReceived, onStatusChange);
         } else {
-          console.warn('[DriveSync] Token en cache absent ou expiré au chargement de la page — reconnexion nécessaire.');
+          console.warn('[DriveSync] Token en cache expiré au chargement de la page — tentative de renouvellement silencieux.');
           localStorage.removeItem(TOKEN_INFO_KEY);
           driveState.isConnected = false;
+          hadExpiredCachedToken = true;
           if (onStatusChange) onStatusChange(driveState);
         }
       } catch (e) {
@@ -302,8 +404,20 @@ export function initDriveSync(onStatusChange, onDataReceived) {
 
     // 3. Pre-initialize TokenClient eagerly in background
     ensureGISLoaded(3000).then((isLoaded) => {
-      if (isLoaded) {
-        setupTokenClient(onDataReceived, onStatusChange);
+      if (!isLoaded) return;
+
+      setupTokenClient(onDataReceived, onStatusChange);
+      scheduleProactiveRefreshCheck();
+
+      if (hadExpiredCachedToken && driveState.user?.email) {
+        attemptSilentRefresh().then((ok) => {
+          if (ok) {
+            console.info('[DriveSync] Reconnexion silencieuse réussie au chargement de la page.');
+            if (onDataReceived) syncWithDrive(onDataReceived, onStatusChange);
+          } else {
+            console.warn('[DriveSync] Reconnexion silencieuse impossible au chargement — reconnexion manuelle nécessaire.');
+          }
+        });
       }
     });
   } catch (initErr) {
@@ -324,6 +438,7 @@ export function loginGoogleDrive(onDataReceived, onStatusChange) {
     }
 
     if (tokenClient) {
+      silentRefreshResolver = null;
       const cachedUserStr = localStorage.getItem(USER_KEY);
       let userEmail = driveState.user?.email;
       if (!userEmail && cachedUserStr) {
@@ -358,6 +473,8 @@ export function logoutGoogleDrive(onStatusChange) {
     }
   } catch (e) {}
 
+  clearInterval(refreshCheckTimer);
+  silentRefreshResolver = null;
   accessToken = null;
   driveFileId = null;
   tokenExpiryTime = 0;
