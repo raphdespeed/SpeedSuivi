@@ -251,15 +251,29 @@
           </button>
 
           <!-- Google Drive Sync Button / Connected Dropdown -->
-          <button 
-            v-if="!driveSyncState.isConnected"
-            @click="loginDrive"
-            class="text-xs font-heading font-semibold px-3.5 py-1.5 rounded-lg border border-white/10 text-gray-300 hover:bg-white/10 hover:text-white transition-all flex items-center gap-1.5 bg-surfaceBg shadow-md"
-            title="Connecter Google Drive pour la synchronisation cloud automatique"
-          >
-            <svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 87.3 78" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/><path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44c-.8 1.4-1.2 2.95-1.2 4.5h27.5z" fill="#00ac47"/><path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l3.85-6.65c.8-1.4 1.2-2.95 1.2-4.5h-27.5l13.75 23.85c1.4 0 3-.4 4.4-1.4z" fill="#ea4335"/><path d="m43.65 25 13.75 23.8h27.5c0-1.55-.4-3.1-1.2-4.5l-25.4-44c-.8-1.4-1.95-2.5-3.3-3.3z" fill="#00832d"/><path d="m57.4 48.8h-27.5l-13.75 23.8c1.35.8 2.9 1.4 4.5 1.4h50.9c1.6 0 3.15-.45 4.5-1.4z" fill="#2684fc"/><path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.4c-1.6 0-3.15.4-4.5 1.2z" fill="#ffba00"/></svg>
-            <span class="hidden sm:inline">Synchro Google Drive</span>
-          </button>
+          <div v-if="!driveSyncState.isConnected" class="relative">
+            <button
+              @click="loginDrive"
+              class="text-xs font-heading font-semibold px-3.5 py-1.5 rounded-lg border border-white/10 text-gray-300 hover:bg-white/10 hover:text-white transition-all flex items-center gap-1.5 bg-surfaceBg shadow-md"
+              title="Connecter Google Drive pour la synchronisation cloud automatique"
+            >
+              <svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 87.3 78" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/><path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44c-.8 1.4-1.2 2.95-1.2 4.5h27.5z" fill="#00ac47"/><path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l3.85-6.65c.8-1.4 1.2-2.95 1.2-4.5h-27.5l13.75 23.85c1.4 0 3-.4 4.4-1.4z" fill="#ea4335"/><path d="m43.65 25 13.75 23.8h27.5c0-1.55-.4-3.1-1.2-4.5l-25.4-44c-.8-1.4-1.95-2.5-3.3-3.3z" fill="#00832d"/><path d="m57.4 48.8h-27.5l-13.75 23.8c1.35.8 2.9 1.4 4.5 1.4h50.9c1.6 0 3.15-.45 4.5-1.4z" fill="#2684fc"/><path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.4c-1.6 0-3.15.4-4.5 1.2z" fill="#ffba00"/></svg>
+              <span class="hidden sm:inline">Synchro Google Drive</span>
+            </button>
+
+            <!-- Disconnect hint: points back up at this button -->
+            <div v-if="showDriveDisconnectHint" class="absolute right-0 top-full mt-3 w-64 z-[60] animate-fadeIn">
+              <div class="relative bg-cardBg border border-amber-500/40 rounded-xl shadow-2xl p-4 text-xs">
+                <div class="absolute -top-2 right-6 w-4 h-4 bg-cardBg border-t border-l border-amber-500/40 rotate-45"></div>
+                <p class="font-heading font-bold text-white mb-1 flex items-center gap-1.5">☁️ Google Drive déconnecté</p>
+                <p class="text-gray-400 mb-3">Reconnecte-toi pour retrouver ton historique synchronisé.</p>
+                <div class="flex gap-2 justify-end">
+                  <button @click="showDriveDisconnectHint = false" class="px-3 py-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 font-heading font-semibold transition-colors">Plus tard</button>
+                  <button @click="loginDrive(); showDriveDisconnectHint = false" class="px-3 py-1.5 rounded-lg bg-netflixRed hover:bg-netflixRedHover text-white font-heading font-bold transition-colors">Synchroniser</button>
+                </div>
+              </div>
+            </div>
+          </div>
 
           <!-- Connected Google Drive Badge with Actions Menu -->
           <div v-else class="relative">
@@ -2278,6 +2292,15 @@
           error: null
         });
 
+        const showDriveDisconnectHint = ref(false);
+        watch(() => driveSyncState.value.isConnected, (isConnected, wasConnected) => {
+          if (wasConnected && !isConnected) {
+            showDriveDisconnectHint.value = true;
+          } else if (isConnected) {
+            showDriveDisconnectHint.value = false;
+          }
+        });
+
         const loginDrive = () => {
           loginGoogleDrive();
         };
@@ -3873,6 +3896,7 @@
           changeModalSeason,
           onModalSeasonChange,
           driveSyncState,
+          showDriveDisconnectHint,
           loginDrive,
           logoutDrive,
           showDriveMenu,
