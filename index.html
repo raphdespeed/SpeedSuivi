@@ -1586,6 +1586,30 @@
           </div>
         </div>
 
+        <!-- Saga Collection: other films in the same franchise -->
+        <div v-if="selectedMedia.sagaCollection && selectedMedia.sagaCollection.films.length > 1" class="space-y-4 bg-cardBg/60 p-6 rounded-2xl border border-white/10 shadow-xl">
+          <h4 class="text-xs font-heading font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
+            <span>🏰</span> <span>Collection : {{ selectedMedia.sagaCollection.name }}</span>
+          </h4>
+          <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
+            <div
+              v-for="film in selectedMedia.sagaCollection.films"
+              :key="film.id"
+              @click="openMediaDetail(film)"
+              :class="['bg-surfaceBg border rounded-xl overflow-hidden cursor-pointer hover:-translate-y-1.5 transition-all group shadow-lg flex flex-col', film.tmdbId === selectedMedia.tmdbId ? 'border-netflixRed' : 'border-white/10']"
+            >
+              <div class="aspect-[2/3] bg-gray-900 overflow-hidden relative">
+                <img :src="film.posterPath" :alt="film.title" @error="handleImgError($event, film.title)" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
+                <span v-if="film.tmdbId === selectedMedia.tmdbId" class="absolute top-2 left-2 text-[10px] font-heading font-bold px-2 py-0.5 rounded bg-netflixRed text-white">Ce film</span>
+              </div>
+              <div class="p-2.5 flex flex-col flex-1">
+                <h4 class="font-heading font-bold text-xs text-white line-clamp-1 group-hover:text-netflixRed transition-colors" :title="film.title">{{ film.title }}</h4>
+                <span v-if="film.year" class="text-[10px] text-gray-400 mt-auto pt-1">{{ film.year }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- TMDB Recommendations & Similar Titles Carousel -->
         <div class="space-y-4 pt-6 border-t border-white/10">
           <h3 class="text-sm font-heading font-bold text-white uppercase tracking-wider flex items-center gap-2">
@@ -2820,8 +2844,53 @@
                 }
               }
             }
+
+            // A movie only reveals belongs_to_collection on its own /movie/{id} detail
+            // endpoint (never on discover/search results), so this is the first point
+            // any item - however it was added - can be recognized as part of a saga.
+            // Tag it (persisted, so the badge shows everywhere from now on) and load
+            // its sibling films for the "Collection" section on this page.
+            if (type === 'movie' && data.belongs_to_collection) {
+              markItemAsSaga(item.id);
+              fetchSagaCollectionForMedia(item.id, data.belongs_to_collection.id);
+            }
           } catch (e) {
             console.error('Error fetching extended media details:', e);
+          }
+        };
+
+        const markItemAsSaga = (itemId) => {
+          if (selectedMedia.value && selectedMedia.value.id === itemId) {
+            selectedMedia.value.category = 'saga';
+            selectedMedia.value.isSaga = true;
+          }
+          const idx = collection.value.findIndex(i => i.id === itemId);
+          if (idx >= 0 && !collection.value[idx].isSaga) {
+            collection.value[idx] = {
+              ...collection.value[idx],
+              category: 'saga',
+              isSaga: true,
+              updatedAt: new Date().toISOString()
+            };
+            saveCollection();
+          }
+        };
+
+        const fetchSagaCollectionForMedia = async (itemId, collectionId) => {
+          try {
+            const res = await fetch(`${BASE_URL}/collection/${collectionId}?language=fr-FR`);
+            if (!res.ok) return;
+            const data = await res.json();
+            const films = (data.parts || [])
+              .filter(p => p && p.id && p.poster_path)
+              .sort((a, b) => new Date(a.release_date || 0) - new Date(b.release_date || 0))
+              .map(p => formatItem({ ...p, media_type: 'movie', category: 'saga', isSaga: true }));
+
+            if (selectedMedia.value && selectedMedia.value.id === itemId) {
+              selectedMedia.value.sagaCollection = { id: data.id, name: data.name, films };
+            }
+          } catch (e) {
+            console.error('Error fetching saga collection for media:', e);
           }
         };
 
@@ -3249,7 +3318,10 @@
           sagaCollections.value = [...sagaCollections.value, ...detailed.filter(c => c && c.filmCount > 1)];
         };
 
-        // Initial load of the "Saga" collections grid (resets and fetches a first batch)
+        // Initial load of the "Saga" collections grid. Only the first round blocks behind
+        // the full-page spinner - whatever it finds renders immediately, and any further
+        // top-up rounds run in the background behind the same small spinner already used
+        // for infinite scroll, instead of hiding the whole grid for several rounds.
         const loadSagaCollections = async () => {
           isSearching.value = true;
           sagaCollections.value = [];
@@ -3258,14 +3330,21 @@
           sagaSeenCollectionIds.clear();
           isLoadingSagaCollections.value = true;
           try {
-            let attempts = 0;
+            await fetchSagaCollectionsPage();
+          } finally {
+            isLoadingSagaCollections.value = false;
+            isSearching.value = false;
+          }
+
+          isLoadingMore.value = true;
+          try {
+            let attempts = 1;
             while (sagaCollections.value.length < 12 && sagaHasMore.value && attempts < 8) {
               await fetchSagaCollectionsPage();
               attempts++;
             }
           } finally {
-            isLoadingSagaCollections.value = false;
-            isSearching.value = false;
+            isLoadingMore.value = false;
           }
         };
 
