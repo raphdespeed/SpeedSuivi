@@ -489,18 +489,29 @@
               >
                 <div class="relative aspect-[2/3] bg-gray-900 overflow-hidden">
                   <img :src="item.posterPath" :alt="item.title" @error="handleImgError($event, item.title)" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
-                  <div class="absolute top-2 left-2 flex gap-1">
+                  <button
+                    @click.stop="toggleFavorite(item)"
+                    :class="['absolute top-2 right-2 z-10 w-8 h-8 rounded-full backdrop-blur-md flex items-center justify-center text-sm transition-transform active:scale-90 hover:scale-110 shadow border', isFavoriteItem(item.id) ? 'bg-netflixRed/80 text-white border-netflixRed' : 'bg-black/60 text-gray-400 border-white/10 hover:text-white']"
+                    :title="isFavoriteItem(item.id) ? 'Retirer de À revoir' : 'Marquer À revoir'"
+                  >
+                    <span>🔄</span>
+                  </button>
+                  <div class="absolute top-2 left-2 flex gap-1 pr-10">
                     <span class="text-[10px] font-heading font-bold px-2 py-0.5 rounded bg-netflixRed/90 text-white">🔥 Tendance</span>
                     <span v-if="item.year" class="text-[10px] font-heading px-1.5 py-0.5 rounded bg-black/60 text-gray-300">{{ item.year }}</span>
                   </div>
                 </div>
                 <div class="p-3 flex flex-col flex-1">
                   <h4 class="font-heading font-bold text-sm text-white line-clamp-2 mb-2 leading-snug" :title="item.title">{{ item.title }}</h4>
-                  <div class="mt-auto pt-2 grid grid-cols-2 gap-1.5">
-                    <button @click.stop="quickStartWatching(item)" :class="['text-[10px] font-heading font-bold py-1.5 px-1 rounded-lg text-center transition-colors truncate', getItemStatus(item) === 'in_progress' ? 'bg-netflixRed/20 text-netflixRed border border-netflixRed/40' : 'bg-netflixRed hover:bg-netflixRedHover text-white']">{{ getItemStatus(item) === 'in_progress' ? '✓ En cours' : 'En cours' }}</button>
-                    <button @click.stop="saveItem(item, 'watchlist')" :class="['text-[10px] font-heading font-bold py-1.5 px-1 rounded-lg text-center transition-colors truncate', getItemStatus(item) === 'watchlist' ? 'bg-traktPurple/20 text-traktPurple border border-traktPurple/40' : 'bg-traktPurple hover:opacity-90 text-white']">{{ getItemStatus(item) === 'watchlist' ? '✓ À voir' : 'À voir' }}</button>
-                    <button @click.stop="saveItem(item, 'completed')" :class="['text-[10px] font-heading font-bold py-1.5 px-1 rounded-lg text-center transition-colors truncate', getItemStatus(item) === 'completed' ? 'bg-successGreen/20 text-successGreen border border-successGreen/40' : 'bg-successGreen hover:opacity-90 text-black']">{{ getItemStatus(item) === 'completed' ? '✓ Terminé' : 'Terminé' }}</button>
-                    <button @click.stop="toggleFavorite(item)" :class="['text-[10px] font-heading font-bold py-1.5 px-1 rounded-lg text-center transition-colors truncate', isFavoriteItem(item.id) ? 'bg-amber-500/20 text-amber-500 border border-amber-500/40' : 'bg-amber-500 hover:opacity-90 text-black']">{{ isFavoriteItem(item.id) ? '✓ À revoir' : 'À revoir' }}</button>
+                  <div class="mt-auto pt-2">
+                    <button v-if="getItemStatus(item) === 'in_progress'" @click.stop="openMediaDetail(item)" class="w-full text-[10px] font-heading font-bold py-1.5 px-2 rounded-lg bg-netflixRed/20 text-netflixRed border border-netflixRed/40 text-center">✓ En cours</button>
+                    <button v-else-if="getItemStatus(item) === 'watchlist'" @click.stop="openMediaDetail(item)" class="w-full text-[10px] font-heading font-bold py-1.5 px-2 rounded-lg bg-traktPurple/20 text-traktPurple border border-traktPurple/40 text-center">✓ À voir</button>
+                    <button v-else-if="getItemStatus(item) === 'completed'" @click.stop="openMediaDetail(item)" class="w-full text-[10px] font-heading font-bold py-1.5 px-2 rounded-lg bg-successGreen/20 text-successGreen border border-successGreen/40 text-center">✓ Terminé</button>
+                    <div v-else class="grid grid-cols-3 gap-1.5">
+                      <button @click.stop="quickStartWatching(item)" class="text-[10px] font-heading font-bold py-1.5 px-1 rounded-lg text-center bg-netflixRed hover:bg-netflixRedHover text-white truncate">En cours</button>
+                      <button @click.stop="saveItem(item, 'watchlist')" class="text-[10px] font-heading font-bold py-1.5 px-1 rounded-lg text-center bg-traktPurple hover:opacity-90 text-white truncate">À voir</button>
+                      <button @click.stop="saveItem(item, 'completed')" class="text-[10px] font-heading font-bold py-1.5 px-1 rounded-lg text-center bg-successGreen hover:opacity-90 text-black truncate">Terminé</button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -521,18 +532,29 @@
               >
                 <div class="relative aspect-[2/3] bg-gray-900 overflow-hidden">
                   <img :src="item.posterPath" :alt="item.title" @error="handleImgError($event, item.title)" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
-                  <div class="absolute top-2 left-2 flex gap-1">
+                  <button
+                    @click.stop="toggleFavorite(item)"
+                    :class="['absolute top-2 right-2 z-10 w-8 h-8 rounded-full backdrop-blur-md flex items-center justify-center text-sm transition-transform active:scale-90 hover:scale-110 shadow border', isFavoriteItem(item.id) ? 'bg-netflixRed/80 text-white border-netflixRed' : 'bg-black/60 text-gray-400 border-white/10 hover:text-white']"
+                    :title="isFavoriteItem(item.id) ? 'Retirer de À revoir' : 'Marquer À revoir'"
+                  >
+                    <span>🔄</span>
+                  </button>
+                  <div class="absolute top-2 left-2 flex gap-1 pr-10">
                     <span class="text-[10px] font-heading font-bold px-2 py-0.5 rounded bg-black/80 text-white">🎬 Film</span>
                     <span v-if="item.year" class="text-[10px] font-heading px-1.5 py-0.5 rounded bg-black/60 text-gray-300">{{ item.year }}</span>
                   </div>
                 </div>
                 <div class="p-3 flex flex-col flex-1">
                   <h4 class="font-heading font-bold text-sm text-white line-clamp-2 mb-2 leading-snug" :title="item.title">{{ item.title }}</h4>
-                  <div class="mt-auto pt-2 grid grid-cols-2 gap-1.5">
-                    <button @click.stop="quickStartWatching(item)" :class="['text-[10px] font-heading font-bold py-1.5 px-1 rounded-lg text-center transition-colors truncate', getItemStatus(item) === 'in_progress' ? 'bg-netflixRed/20 text-netflixRed border border-netflixRed/40' : 'bg-netflixRed hover:bg-netflixRedHover text-white']">{{ getItemStatus(item) === 'in_progress' ? '✓ En cours' : 'En cours' }}</button>
-                    <button @click.stop="saveItem(item, 'watchlist')" :class="['text-[10px] font-heading font-bold py-1.5 px-1 rounded-lg text-center transition-colors truncate', getItemStatus(item) === 'watchlist' ? 'bg-traktPurple/20 text-traktPurple border border-traktPurple/40' : 'bg-traktPurple hover:opacity-90 text-white']">{{ getItemStatus(item) === 'watchlist' ? '✓ À voir' : 'À voir' }}</button>
-                    <button @click.stop="saveItem(item, 'completed')" :class="['text-[10px] font-heading font-bold py-1.5 px-1 rounded-lg text-center transition-colors truncate', getItemStatus(item) === 'completed' ? 'bg-successGreen/20 text-successGreen border border-successGreen/40' : 'bg-successGreen hover:opacity-90 text-black']">{{ getItemStatus(item) === 'completed' ? '✓ Terminé' : 'Terminé' }}</button>
-                    <button @click.stop="toggleFavorite(item)" :class="['text-[10px] font-heading font-bold py-1.5 px-1 rounded-lg text-center transition-colors truncate', isFavoriteItem(item.id) ? 'bg-amber-500/20 text-amber-500 border border-amber-500/40' : 'bg-amber-500 hover:opacity-90 text-black']">{{ isFavoriteItem(item.id) ? '✓ À revoir' : 'À revoir' }}</button>
+                  <div class="mt-auto pt-2">
+                    <button v-if="getItemStatus(item) === 'in_progress'" @click.stop="openMediaDetail(item)" class="w-full text-[10px] font-heading font-bold py-1.5 px-2 rounded-lg bg-netflixRed/20 text-netflixRed border border-netflixRed/40 text-center">✓ En cours</button>
+                    <button v-else-if="getItemStatus(item) === 'watchlist'" @click.stop="openMediaDetail(item)" class="w-full text-[10px] font-heading font-bold py-1.5 px-2 rounded-lg bg-traktPurple/20 text-traktPurple border border-traktPurple/40 text-center">✓ À voir</button>
+                    <button v-else-if="getItemStatus(item) === 'completed'" @click.stop="openMediaDetail(item)" class="w-full text-[10px] font-heading font-bold py-1.5 px-2 rounded-lg bg-successGreen/20 text-successGreen border border-successGreen/40 text-center">✓ Terminé</button>
+                    <div v-else class="grid grid-cols-3 gap-1.5">
+                      <button @click.stop="quickStartWatching(item)" class="text-[10px] font-heading font-bold py-1.5 px-1 rounded-lg text-center bg-netflixRed hover:bg-netflixRedHover text-white truncate">En cours</button>
+                      <button @click.stop="saveItem(item, 'watchlist')" class="text-[10px] font-heading font-bold py-1.5 px-1 rounded-lg text-center bg-traktPurple hover:opacity-90 text-white truncate">À voir</button>
+                      <button @click.stop="saveItem(item, 'completed')" class="text-[10px] font-heading font-bold py-1.5 px-1 rounded-lg text-center bg-successGreen hover:opacity-90 text-black truncate">Terminé</button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -553,18 +575,29 @@
               >
                 <div class="relative aspect-[2/3] bg-gray-900 overflow-hidden">
                   <img :src="item.posterPath" :alt="item.title" @error="handleImgError($event, item.title)" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
-                  <div class="absolute top-2 left-2 flex gap-1">
+                  <button
+                    @click.stop="toggleFavorite(item)"
+                    :class="['absolute top-2 right-2 z-10 w-8 h-8 rounded-full backdrop-blur-md flex items-center justify-center text-sm transition-transform active:scale-90 hover:scale-110 shadow border', isFavoriteItem(item.id) ? 'bg-netflixRed/80 text-white border-netflixRed' : 'bg-black/60 text-gray-400 border-white/10 hover:text-white']"
+                    :title="isFavoriteItem(item.id) ? 'Retirer de À revoir' : 'Marquer À revoir'"
+                  >
+                    <span>🔄</span>
+                  </button>
+                  <div class="absolute top-2 left-2 flex gap-1 pr-10">
                     <span class="text-[10px] font-heading font-bold px-2 py-0.5 rounded bg-black/80 text-white">📺 Série</span>
                     <span v-if="item.year" class="text-[10px] font-heading px-1.5 py-0.5 rounded bg-black/60 text-gray-300">{{ item.year }}</span>
                   </div>
                 </div>
                 <div class="p-3 flex flex-col flex-1">
                   <h4 class="font-heading font-bold text-sm text-white line-clamp-2 mb-2 leading-snug" :title="item.title">{{ item.title }}</h4>
-                  <div class="mt-auto pt-2 grid grid-cols-2 gap-1.5">
-                    <button @click.stop="quickStartWatching(item)" :class="['text-[10px] font-heading font-bold py-1.5 px-1 rounded-lg text-center transition-colors truncate', getItemStatus(item) === 'in_progress' ? 'bg-netflixRed/20 text-netflixRed border border-netflixRed/40' : 'bg-netflixRed hover:bg-netflixRedHover text-white']">{{ getItemStatus(item) === 'in_progress' ? '✓ En cours' : 'En cours' }}</button>
-                    <button @click.stop="saveItem(item, 'watchlist')" :class="['text-[10px] font-heading font-bold py-1.5 px-1 rounded-lg text-center transition-colors truncate', getItemStatus(item) === 'watchlist' ? 'bg-traktPurple/20 text-traktPurple border border-traktPurple/40' : 'bg-traktPurple hover:opacity-90 text-white']">{{ getItemStatus(item) === 'watchlist' ? '✓ À voir' : 'À voir' }}</button>
-                    <button @click.stop="saveItem(item, 'completed')" :class="['text-[10px] font-heading font-bold py-1.5 px-1 rounded-lg text-center transition-colors truncate', getItemStatus(item) === 'completed' ? 'bg-successGreen/20 text-successGreen border border-successGreen/40' : 'bg-successGreen hover:opacity-90 text-black']">{{ getItemStatus(item) === 'completed' ? '✓ Terminé' : 'Terminé' }}</button>
-                    <button @click.stop="toggleFavorite(item)" :class="['text-[10px] font-heading font-bold py-1.5 px-1 rounded-lg text-center transition-colors truncate', isFavoriteItem(item.id) ? 'bg-amber-500/20 text-amber-500 border border-amber-500/40' : 'bg-amber-500 hover:opacity-90 text-black']">{{ isFavoriteItem(item.id) ? '✓ À revoir' : 'À revoir' }}</button>
+                  <div class="mt-auto pt-2">
+                    <button v-if="getItemStatus(item) === 'in_progress'" @click.stop="openMediaDetail(item)" class="w-full text-[10px] font-heading font-bold py-1.5 px-2 rounded-lg bg-netflixRed/20 text-netflixRed border border-netflixRed/40 text-center">✓ En cours</button>
+                    <button v-else-if="getItemStatus(item) === 'watchlist'" @click.stop="openMediaDetail(item)" class="w-full text-[10px] font-heading font-bold py-1.5 px-2 rounded-lg bg-traktPurple/20 text-traktPurple border border-traktPurple/40 text-center">✓ À voir</button>
+                    <button v-else-if="getItemStatus(item) === 'completed'" @click.stop="openMediaDetail(item)" class="w-full text-[10px] font-heading font-bold py-1.5 px-2 rounded-lg bg-successGreen/20 text-successGreen border border-successGreen/40 text-center">✓ Terminé</button>
+                    <div v-else class="grid grid-cols-3 gap-1.5">
+                      <button @click.stop="quickStartWatching(item)" class="text-[10px] font-heading font-bold py-1.5 px-1 rounded-lg text-center bg-netflixRed hover:bg-netflixRedHover text-white truncate">En cours</button>
+                      <button @click.stop="saveItem(item, 'watchlist')" class="text-[10px] font-heading font-bold py-1.5 px-1 rounded-lg text-center bg-traktPurple hover:opacity-90 text-white truncate">À voir</button>
+                      <button @click.stop="saveItem(item, 'completed')" class="text-[10px] font-heading font-bold py-1.5 px-1 rounded-lg text-center bg-successGreen hover:opacity-90 text-black truncate">Terminé</button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -585,18 +618,29 @@
               >
                 <div class="relative aspect-[2/3] bg-gray-900 overflow-hidden">
                   <img :src="item.posterPath" :alt="item.title" @error="handleImgError($event, item.title)" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
-                  <div class="absolute top-2 left-2 flex gap-1">
+                  <button
+                    @click.stop="toggleFavorite(item)"
+                    :class="['absolute top-2 right-2 z-10 w-8 h-8 rounded-full backdrop-blur-md flex items-center justify-center text-sm transition-transform active:scale-90 hover:scale-110 shadow border', isFavoriteItem(item.id) ? 'bg-netflixRed/80 text-white border-netflixRed' : 'bg-black/60 text-gray-400 border-white/10 hover:text-white']"
+                    :title="isFavoriteItem(item.id) ? 'Retirer de À revoir' : 'Marquer À revoir'"
+                  >
+                    <span>🔄</span>
+                  </button>
+                  <div class="absolute top-2 left-2 flex gap-1 pr-10">
                     <span class="text-[10px] font-heading font-bold px-2 py-0.5 rounded bg-purple-600/90 text-white">🇯🇵 Animé</span>
                     <span v-if="item.year" class="text-[10px] font-heading px-1.5 py-0.5 rounded bg-black/60 text-gray-300">{{ item.year }}</span>
                   </div>
                 </div>
                 <div class="p-3 flex flex-col flex-1">
                   <h4 class="font-heading font-bold text-sm text-white line-clamp-2 mb-2 leading-snug" :title="item.title">{{ item.title }}</h4>
-                  <div class="mt-auto pt-2 grid grid-cols-2 gap-1.5">
-                    <button @click.stop="quickStartWatching(item)" :class="['text-[10px] font-heading font-bold py-1.5 px-1 rounded-lg text-center transition-colors truncate', getItemStatus(item) === 'in_progress' ? 'bg-netflixRed/20 text-netflixRed border border-netflixRed/40' : 'bg-netflixRed hover:bg-netflixRedHover text-white']">{{ getItemStatus(item) === 'in_progress' ? '✓ En cours' : 'En cours' }}</button>
-                    <button @click.stop="saveItem(item, 'watchlist')" :class="['text-[10px] font-heading font-bold py-1.5 px-1 rounded-lg text-center transition-colors truncate', getItemStatus(item) === 'watchlist' ? 'bg-traktPurple/20 text-traktPurple border border-traktPurple/40' : 'bg-traktPurple hover:opacity-90 text-white']">{{ getItemStatus(item) === 'watchlist' ? '✓ À voir' : 'À voir' }}</button>
-                    <button @click.stop="saveItem(item, 'completed')" :class="['text-[10px] font-heading font-bold py-1.5 px-1 rounded-lg text-center transition-colors truncate', getItemStatus(item) === 'completed' ? 'bg-successGreen/20 text-successGreen border border-successGreen/40' : 'bg-successGreen hover:opacity-90 text-black']">{{ getItemStatus(item) === 'completed' ? '✓ Terminé' : 'Terminé' }}</button>
-                    <button @click.stop="toggleFavorite(item)" :class="['text-[10px] font-heading font-bold py-1.5 px-1 rounded-lg text-center transition-colors truncate', isFavoriteItem(item.id) ? 'bg-amber-500/20 text-amber-500 border border-amber-500/40' : 'bg-amber-500 hover:opacity-90 text-black']">{{ isFavoriteItem(item.id) ? '✓ À revoir' : 'À revoir' }}</button>
+                  <div class="mt-auto pt-2">
+                    <button v-if="getItemStatus(item) === 'in_progress'" @click.stop="openMediaDetail(item)" class="w-full text-[10px] font-heading font-bold py-1.5 px-2 rounded-lg bg-netflixRed/20 text-netflixRed border border-netflixRed/40 text-center">✓ En cours</button>
+                    <button v-else-if="getItemStatus(item) === 'watchlist'" @click.stop="openMediaDetail(item)" class="w-full text-[10px] font-heading font-bold py-1.5 px-2 rounded-lg bg-traktPurple/20 text-traktPurple border border-traktPurple/40 text-center">✓ À voir</button>
+                    <button v-else-if="getItemStatus(item) === 'completed'" @click.stop="openMediaDetail(item)" class="w-full text-[10px] font-heading font-bold py-1.5 px-2 rounded-lg bg-successGreen/20 text-successGreen border border-successGreen/40 text-center">✓ Terminé</button>
+                    <div v-else class="grid grid-cols-3 gap-1.5">
+                      <button @click.stop="quickStartWatching(item)" class="text-[10px] font-heading font-bold py-1.5 px-1 rounded-lg text-center bg-netflixRed hover:bg-netflixRedHover text-white truncate">En cours</button>
+                      <button @click.stop="saveItem(item, 'watchlist')" class="text-[10px] font-heading font-bold py-1.5 px-1 rounded-lg text-center bg-traktPurple hover:opacity-90 text-white truncate">À voir</button>
+                      <button @click.stop="saveItem(item, 'completed')" class="text-[10px] font-heading font-bold py-1.5 px-1 rounded-lg text-center bg-successGreen hover:opacity-90 text-black truncate">Terminé</button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -617,18 +661,29 @@
               >
                 <div class="relative aspect-[2/3] bg-gray-900 overflow-hidden">
                   <img :src="item.posterPath" :alt="item.title" @error="handleImgError($event, item.title)" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
-                  <div class="absolute top-2 left-2 flex gap-1">
+                  <button
+                    @click.stop="toggleFavorite(item)"
+                    :class="['absolute top-2 right-2 z-10 w-8 h-8 rounded-full backdrop-blur-md flex items-center justify-center text-sm transition-transform active:scale-90 hover:scale-110 shadow border', isFavoriteItem(item.id) ? 'bg-netflixRed/80 text-white border-netflixRed' : 'bg-black/60 text-gray-400 border-white/10 hover:text-white']"
+                    :title="isFavoriteItem(item.id) ? 'Retirer de À revoir' : 'Marquer À revoir'"
+                  >
+                    <span>🔄</span>
+                  </button>
+                  <div class="absolute top-2 left-2 flex gap-1 pr-10">
                     <span class="text-[10px] font-heading font-bold px-2 py-0.5 rounded bg-pink-600/90 text-white">🇰🇷 K-Drama</span>
                     <span v-if="item.year" class="text-[10px] font-heading px-1.5 py-0.5 rounded bg-black/60 text-gray-300">{{ item.year }}</span>
                   </div>
                 </div>
                 <div class="p-3 flex flex-col flex-1">
                   <h4 class="font-heading font-bold text-sm text-white line-clamp-2 mb-2 leading-snug" :title="item.title">{{ item.title }}</h4>
-                  <div class="mt-auto pt-2 grid grid-cols-2 gap-1.5">
-                    <button @click.stop="quickStartWatching(item)" :class="['text-[10px] font-heading font-bold py-1.5 px-1 rounded-lg text-center transition-colors truncate', getItemStatus(item) === 'in_progress' ? 'bg-netflixRed/20 text-netflixRed border border-netflixRed/40' : 'bg-netflixRed hover:bg-netflixRedHover text-white']">{{ getItemStatus(item) === 'in_progress' ? '✓ En cours' : 'En cours' }}</button>
-                    <button @click.stop="saveItem(item, 'watchlist')" :class="['text-[10px] font-heading font-bold py-1.5 px-1 rounded-lg text-center transition-colors truncate', getItemStatus(item) === 'watchlist' ? 'bg-traktPurple/20 text-traktPurple border border-traktPurple/40' : 'bg-traktPurple hover:opacity-90 text-white']">{{ getItemStatus(item) === 'watchlist' ? '✓ À voir' : 'À voir' }}</button>
-                    <button @click.stop="saveItem(item, 'completed')" :class="['text-[10px] font-heading font-bold py-1.5 px-1 rounded-lg text-center transition-colors truncate', getItemStatus(item) === 'completed' ? 'bg-successGreen/20 text-successGreen border border-successGreen/40' : 'bg-successGreen hover:opacity-90 text-black']">{{ getItemStatus(item) === 'completed' ? '✓ Terminé' : 'Terminé' }}</button>
-                    <button @click.stop="toggleFavorite(item)" :class="['text-[10px] font-heading font-bold py-1.5 px-1 rounded-lg text-center transition-colors truncate', isFavoriteItem(item.id) ? 'bg-amber-500/20 text-amber-500 border border-amber-500/40' : 'bg-amber-500 hover:opacity-90 text-black']">{{ isFavoriteItem(item.id) ? '✓ À revoir' : 'À revoir' }}</button>
+                  <div class="mt-auto pt-2">
+                    <button v-if="getItemStatus(item) === 'in_progress'" @click.stop="openMediaDetail(item)" class="w-full text-[10px] font-heading font-bold py-1.5 px-2 rounded-lg bg-netflixRed/20 text-netflixRed border border-netflixRed/40 text-center">✓ En cours</button>
+                    <button v-else-if="getItemStatus(item) === 'watchlist'" @click.stop="openMediaDetail(item)" class="w-full text-[10px] font-heading font-bold py-1.5 px-2 rounded-lg bg-traktPurple/20 text-traktPurple border border-traktPurple/40 text-center">✓ À voir</button>
+                    <button v-else-if="getItemStatus(item) === 'completed'" @click.stop="openMediaDetail(item)" class="w-full text-[10px] font-heading font-bold py-1.5 px-2 rounded-lg bg-successGreen/20 text-successGreen border border-successGreen/40 text-center">✓ Terminé</button>
+                    <div v-else class="grid grid-cols-3 gap-1.5">
+                      <button @click.stop="quickStartWatching(item)" class="text-[10px] font-heading font-bold py-1.5 px-1 rounded-lg text-center bg-netflixRed hover:bg-netflixRedHover text-white truncate">En cours</button>
+                      <button @click.stop="saveItem(item, 'watchlist')" class="text-[10px] font-heading font-bold py-1.5 px-1 rounded-lg text-center bg-traktPurple hover:opacity-90 text-white truncate">À voir</button>
+                      <button @click.stop="saveItem(item, 'completed')" class="text-[10px] font-heading font-bold py-1.5 px-1 rounded-lg text-center bg-successGreen hover:opacity-90 text-black truncate">Terminé</button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -649,18 +704,29 @@
               >
                 <div class="relative aspect-[2/3] bg-gray-900 overflow-hidden">
                   <img :src="item.posterPath" :alt="item.title" @error="handleImgError($event, item.title)" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
-                  <div class="absolute top-2 left-2 flex gap-1">
+                  <button
+                    @click.stop="toggleFavorite(item)"
+                    :class="['absolute top-2 right-2 z-10 w-8 h-8 rounded-full backdrop-blur-md flex items-center justify-center text-sm transition-transform active:scale-90 hover:scale-110 shadow border', isFavoriteItem(item.id) ? 'bg-netflixRed/80 text-white border-netflixRed' : 'bg-black/60 text-gray-400 border-white/10 hover:text-white']"
+                    :title="isFavoriteItem(item.id) ? 'Retirer de À revoir' : 'Marquer À revoir'"
+                  >
+                    <span>🔄</span>
+                  </button>
+                  <div class="absolute top-2 left-2 flex gap-1 pr-10">
                     <span class="text-[10px] font-heading font-bold px-2 py-0.5 rounded bg-amber-500/90 text-black font-extrabold">⭐ {{ item.voteAverage ? item.voteAverage.toFixed(1) : 'Top' }}</span>
                     <span v-if="item.year" class="text-[10px] font-heading px-1.5 py-0.5 rounded bg-black/60 text-gray-300">{{ item.year }}</span>
                   </div>
                 </div>
                 <div class="p-3 flex flex-col flex-1">
                   <h4 class="font-heading font-bold text-sm text-white line-clamp-2 mb-2 leading-snug" :title="item.title">{{ item.title }}</h4>
-                  <div class="mt-auto pt-2 grid grid-cols-2 gap-1.5">
-                    <button @click.stop="quickStartWatching(item)" :class="['text-[10px] font-heading font-bold py-1.5 px-1 rounded-lg text-center transition-colors truncate', getItemStatus(item) === 'in_progress' ? 'bg-netflixRed/20 text-netflixRed border border-netflixRed/40' : 'bg-netflixRed hover:bg-netflixRedHover text-white']">{{ getItemStatus(item) === 'in_progress' ? '✓ En cours' : 'En cours' }}</button>
-                    <button @click.stop="saveItem(item, 'watchlist')" :class="['text-[10px] font-heading font-bold py-1.5 px-1 rounded-lg text-center transition-colors truncate', getItemStatus(item) === 'watchlist' ? 'bg-traktPurple/20 text-traktPurple border border-traktPurple/40' : 'bg-traktPurple hover:opacity-90 text-white']">{{ getItemStatus(item) === 'watchlist' ? '✓ À voir' : 'À voir' }}</button>
-                    <button @click.stop="saveItem(item, 'completed')" :class="['text-[10px] font-heading font-bold py-1.5 px-1 rounded-lg text-center transition-colors truncate', getItemStatus(item) === 'completed' ? 'bg-successGreen/20 text-successGreen border border-successGreen/40' : 'bg-successGreen hover:opacity-90 text-black']">{{ getItemStatus(item) === 'completed' ? '✓ Terminé' : 'Terminé' }}</button>
-                    <button @click.stop="toggleFavorite(item)" :class="['text-[10px] font-heading font-bold py-1.5 px-1 rounded-lg text-center transition-colors truncate', isFavoriteItem(item.id) ? 'bg-amber-500/20 text-amber-500 border border-amber-500/40' : 'bg-amber-500 hover:opacity-90 text-black']">{{ isFavoriteItem(item.id) ? '✓ À revoir' : 'À revoir' }}</button>
+                  <div class="mt-auto pt-2">
+                    <button v-if="getItemStatus(item) === 'in_progress'" @click.stop="openMediaDetail(item)" class="w-full text-[10px] font-heading font-bold py-1.5 px-2 rounded-lg bg-netflixRed/20 text-netflixRed border border-netflixRed/40 text-center">✓ En cours</button>
+                    <button v-else-if="getItemStatus(item) === 'watchlist'" @click.stop="openMediaDetail(item)" class="w-full text-[10px] font-heading font-bold py-1.5 px-2 rounded-lg bg-traktPurple/20 text-traktPurple border border-traktPurple/40 text-center">✓ À voir</button>
+                    <button v-else-if="getItemStatus(item) === 'completed'" @click.stop="openMediaDetail(item)" class="w-full text-[10px] font-heading font-bold py-1.5 px-2 rounded-lg bg-successGreen/20 text-successGreen border border-successGreen/40 text-center">✓ Terminé</button>
+                    <div v-else class="grid grid-cols-3 gap-1.5">
+                      <button @click.stop="quickStartWatching(item)" class="text-[10px] font-heading font-bold py-1.5 px-1 rounded-lg text-center bg-netflixRed hover:bg-netflixRedHover text-white truncate">En cours</button>
+                      <button @click.stop="saveItem(item, 'watchlist')" class="text-[10px] font-heading font-bold py-1.5 px-1 rounded-lg text-center bg-traktPurple hover:opacity-90 text-white truncate">À voir</button>
+                      <button @click.stop="saveItem(item, 'completed')" class="text-[10px] font-heading font-bold py-1.5 px-1 rounded-lg text-center bg-successGreen hover:opacity-90 text-black truncate">Terminé</button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -681,18 +747,29 @@
               >
                 <div class="relative aspect-[2/3] bg-gray-900 overflow-hidden">
                   <img :src="item.posterPath" :alt="item.title" @error="handleImgError($event, item.title)" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
-                  <div class="absolute top-2 left-2 flex gap-1">
+                  <button
+                    @click.stop="toggleFavorite(item)"
+                    :class="['absolute top-2 right-2 z-10 w-8 h-8 rounded-full backdrop-blur-md flex items-center justify-center text-sm transition-transform active:scale-90 hover:scale-110 shadow border', isFavoriteItem(item.id) ? 'bg-netflixRed/80 text-white border-netflixRed' : 'bg-black/60 text-gray-400 border-white/10 hover:text-white']"
+                    :title="isFavoriteItem(item.id) ? 'Retirer de À revoir' : 'Marquer À revoir'"
+                  >
+                    <span>🔄</span>
+                  </button>
+                  <div class="absolute top-2 left-2 flex gap-1 pr-10">
                     <span class="text-[10px] font-heading font-bold px-2 py-0.5 rounded bg-emerald-500/90 text-black font-extrabold">👑 Top</span>
                     <span v-if="item.year" class="text-[10px] font-heading px-1.5 py-0.5 rounded bg-black/60 text-gray-300">{{ item.year }}</span>
                   </div>
                 </div>
                 <div class="p-3 flex flex-col flex-1">
                   <h4 class="font-heading font-bold text-sm text-white line-clamp-2 mb-2 leading-snug" :title="item.title">{{ item.title }}</h4>
-                  <div class="mt-auto pt-2 grid grid-cols-2 gap-1.5">
-                    <button @click.stop="quickStartWatching(item)" :class="['text-[10px] font-heading font-bold py-1.5 px-1 rounded-lg text-center transition-colors truncate', getItemStatus(item) === 'in_progress' ? 'bg-netflixRed/20 text-netflixRed border border-netflixRed/40' : 'bg-netflixRed hover:bg-netflixRedHover text-white']">{{ getItemStatus(item) === 'in_progress' ? '✓ En cours' : 'En cours' }}</button>
-                    <button @click.stop="saveItem(item, 'watchlist')" :class="['text-[10px] font-heading font-bold py-1.5 px-1 rounded-lg text-center transition-colors truncate', getItemStatus(item) === 'watchlist' ? 'bg-traktPurple/20 text-traktPurple border border-traktPurple/40' : 'bg-traktPurple hover:opacity-90 text-white']">{{ getItemStatus(item) === 'watchlist' ? '✓ À voir' : 'À voir' }}</button>
-                    <button @click.stop="saveItem(item, 'completed')" :class="['text-[10px] font-heading font-bold py-1.5 px-1 rounded-lg text-center transition-colors truncate', getItemStatus(item) === 'completed' ? 'bg-successGreen/20 text-successGreen border border-successGreen/40' : 'bg-successGreen hover:opacity-90 text-black']">{{ getItemStatus(item) === 'completed' ? '✓ Terminé' : 'Terminé' }}</button>
-                    <button @click.stop="toggleFavorite(item)" :class="['text-[10px] font-heading font-bold py-1.5 px-1 rounded-lg text-center transition-colors truncate', isFavoriteItem(item.id) ? 'bg-amber-500/20 text-amber-500 border border-amber-500/40' : 'bg-amber-500 hover:opacity-90 text-black']">{{ isFavoriteItem(item.id) ? '✓ À revoir' : 'À revoir' }}</button>
+                  <div class="mt-auto pt-2">
+                    <button v-if="getItemStatus(item) === 'in_progress'" @click.stop="openMediaDetail(item)" class="w-full text-[10px] font-heading font-bold py-1.5 px-2 rounded-lg bg-netflixRed/20 text-netflixRed border border-netflixRed/40 text-center">✓ En cours</button>
+                    <button v-else-if="getItemStatus(item) === 'watchlist'" @click.stop="openMediaDetail(item)" class="w-full text-[10px] font-heading font-bold py-1.5 px-2 rounded-lg bg-traktPurple/20 text-traktPurple border border-traktPurple/40 text-center">✓ À voir</button>
+                    <button v-else-if="getItemStatus(item) === 'completed'" @click.stop="openMediaDetail(item)" class="w-full text-[10px] font-heading font-bold py-1.5 px-2 rounded-lg bg-successGreen/20 text-successGreen border border-successGreen/40 text-center">✓ Terminé</button>
+                    <div v-else class="grid grid-cols-3 gap-1.5">
+                      <button @click.stop="quickStartWatching(item)" class="text-[10px] font-heading font-bold py-1.5 px-1 rounded-lg text-center bg-netflixRed hover:bg-netflixRedHover text-white truncate">En cours</button>
+                      <button @click.stop="saveItem(item, 'watchlist')" class="text-[10px] font-heading font-bold py-1.5 px-1 rounded-lg text-center bg-traktPurple hover:opacity-90 text-white truncate">À voir</button>
+                      <button @click.stop="saveItem(item, 'completed')" class="text-[10px] font-heading font-bold py-1.5 px-1 rounded-lg text-center bg-successGreen hover:opacity-90 text-black truncate">Terminé</button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -780,8 +857,17 @@
                   <span class="bg-netflixRed text-white p-3 rounded-full shadow-lg transform group-hover:scale-110 transition-transform">ℹ️</span>
                 </div>
 
+                <!-- Toggle "À revoir" Button -->
+                <button
+                  @click.stop="toggleFavorite(item)"
+                  :class="['absolute top-2 right-2 z-10 w-8 h-8 rounded-full backdrop-blur-md flex items-center justify-center text-sm transition-transform active:scale-90 hover:scale-110 shadow border', isFavoriteItem(item.id) ? 'bg-netflixRed/80 text-white border-netflixRed' : 'bg-black/60 text-gray-400 border-white/10 hover:text-white']"
+                  :title="isFavoriteItem(item.id) ? 'Retirer de À revoir' : 'Marquer À revoir'"
+                >
+                  <span>🔄</span>
+                </button>
+
                 <!-- Category & Rating Badges -->
-                <div class="absolute top-2 left-2 flex flex-wrap gap-1 pr-2">
+                <div class="absolute top-2 left-2 flex flex-wrap gap-1 pr-10">
                   <span
                     :class="['text-[10px] font-heading font-bold px-2 py-0.5 rounded backdrop-blur-md shadow', item.category === 'saga' ? 'bg-amber-600/90 text-white font-extrabold' : item.category === 'kdrama' ? 'bg-pink-600/90 text-white' : item.category === 'anime' ? 'bg-purple-600/90 text-white' : 'bg-black/80 text-white']"
                   >
@@ -810,11 +896,15 @@
               <div class="p-3 flex flex-col flex-1">
                 <h3 class="font-heading font-bold text-sm text-white line-clamp-2 mb-2 leading-snug" :title="item.title">{{ item.title }}</h3>
 
-                <div class="mt-auto pt-2 grid grid-cols-2 gap-1.5">
-                  <button @click.stop="quickStartWatching(item)" :class="['text-[10px] font-heading font-bold py-1.5 px-1 rounded-lg text-center transition-colors truncate', getItemStatus(item) === 'in_progress' ? 'bg-netflixRed/20 text-netflixRed border border-netflixRed/40' : 'bg-netflixRed hover:bg-netflixRedHover text-white']">{{ getItemStatus(item) === 'in_progress' ? '✓ En cours' : 'En cours' }}</button>
-                  <button @click.stop="saveItem(item, 'watchlist')" :class="['text-[10px] font-heading font-bold py-1.5 px-1 rounded-lg text-center transition-colors truncate', getItemStatus(item) === 'watchlist' ? 'bg-traktPurple/20 text-traktPurple border border-traktPurple/40' : 'bg-traktPurple hover:opacity-90 text-white']">{{ getItemStatus(item) === 'watchlist' ? '✓ À voir' : 'À voir' }}</button>
-                  <button @click.stop="saveItem(item, 'completed')" :class="['text-[10px] font-heading font-bold py-1.5 px-1 rounded-lg text-center transition-colors truncate', getItemStatus(item) === 'completed' ? 'bg-successGreen/20 text-successGreen border border-successGreen/40' : 'bg-successGreen hover:opacity-90 text-black']">{{ getItemStatus(item) === 'completed' ? '✓ Terminé' : 'Terminé' }}</button>
-                  <button @click.stop="toggleFavorite(item)" :class="['text-[10px] font-heading font-bold py-1.5 px-1 rounded-lg text-center transition-colors truncate', isFavoriteItem(item.id) ? 'bg-amber-500/20 text-amber-500 border border-amber-500/40' : 'bg-amber-500 hover:opacity-90 text-black']">{{ isFavoriteItem(item.id) ? '✓ À revoir' : 'À revoir' }}</button>
+                <div class="mt-auto pt-2">
+                  <button v-if="getItemStatus(item) === 'in_progress'" @click.stop="openMediaDetail(item)" class="w-full text-[10px] font-heading font-bold py-1.5 px-2 rounded-lg bg-netflixRed/20 text-netflixRed border border-netflixRed/40 text-center">✓ En cours</button>
+                  <button v-else-if="getItemStatus(item) === 'watchlist'" @click.stop="openMediaDetail(item)" class="w-full text-[10px] font-heading font-bold py-1.5 px-2 rounded-lg bg-traktPurple/20 text-traktPurple border border-traktPurple/40 text-center">✓ À voir</button>
+                  <button v-else-if="getItemStatus(item) === 'completed'" @click.stop="openMediaDetail(item)" class="w-full text-[10px] font-heading font-bold py-1.5 px-2 rounded-lg bg-successGreen/20 text-successGreen border border-successGreen/40 text-center">✓ Terminé</button>
+                  <div v-else class="grid grid-cols-3 gap-1.5">
+                    <button @click.stop="quickStartWatching(item)" class="text-[10px] font-heading font-bold py-1.5 px-1 rounded-lg text-center bg-netflixRed hover:bg-netflixRedHover text-white truncate">En cours</button>
+                    <button @click.stop="saveItem(item, 'watchlist')" class="text-[10px] font-heading font-bold py-1.5 px-1 rounded-lg text-center bg-traktPurple hover:opacity-90 text-white truncate">À voir</button>
+                    <button @click.stop="saveItem(item, 'completed')" class="text-[10px] font-heading font-bold py-1.5 px-1 rounded-lg text-center bg-successGreen hover:opacity-90 text-black truncate">Terminé</button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -2637,13 +2727,17 @@
         const openMediaDetail = async (item, updateHash = true) => {
           saveScrollPosition();
           selectedPerson.value = null;
-          selectedMedia.value = item;
+          // The card that triggered this can be a raw, untracked search-result object -
+          // merge in the real tracked entry (status/isFavorite/progress) so the film page
+          // always reflects what was just chosen on the poster, not stale/absent fields.
+          const tracked = collection.value.find(i => i.id === item.id);
+          selectedMedia.value = tracked ? { ...item, ...tracked } : item;
           // "À revoir" isn't a real status (it's the separate isFavorite flag), but it's
           // shown as one of the 4 tracking buttons - reflect it here if set, since it's
           // otherwise not visible anywhere on this page anymore.
-          modalStatus.value = item.isFavorite ? 'favorites' : (item.status || null);
-          modalSeason.value = item.currentSeason || 1;
-          modalEpisode.value = item.currentEpisode || 0;
+          modalStatus.value = selectedMedia.value.isFavorite ? 'favorites' : (selectedMedia.value.status || null);
+          modalSeason.value = selectedMedia.value.currentSeason || 1;
+          modalEpisode.value = selectedMedia.value.currentEpisode || 0;
           
           if (updateHash) {
             window.location.hash = `#media/${item.id}`;
@@ -3140,26 +3234,39 @@
         const toggleFavorite = (item) => {
           const itemId = item.id;
           const existingIndex = collection.value.findIndex(i => i.id === itemId);
+          const isMovie = item.mediaType === 'movie';
+          const defaultTotalEp = item.totalEpisodes || (isMovie ? 1 : 12);
 
           if (existingIndex >= 0) {
             const currentFav = !!collection.value[existingIndex].isFavorite;
-            collection.value[existingIndex].isFavorite = !currentFav;
+            const turningOn = !currentFav;
+            collection.value[existingIndex].isFavorite = turningOn;
+            // Marking "à revoir" implies the item has already been watched - pair it with
+            // Terminé automatically, same as the film page's own save flow already does.
+            if (turningOn) {
+              collection.value[existingIndex].status = 'completed';
+              collection.value[existingIndex].currentEpisode = collection.value[existingIndex].totalEpisodes || defaultTotalEp;
+            }
             collection.value[existingIndex].updatedAt = new Date().toISOString();
-            if (item) item.isFavorite = !currentFav;
+            if (item) {
+              item.isFavorite = turningOn;
+              if (turningOn) item.status = 'completed';
+            }
 
             saveCollection();
-            showToast(!currentFav ? `"${item.title}" marqué comme À revoir 🔄` : `"${item.title}" retiré de À revoir`, !currentFav ? 'success' : 'info');
+            showToast(turningOn ? `"${item.title}" marqué comme À revoir 🔄` : `"${item.title}" retiré de À revoir`, turningOn ? 'success' : 'info');
           } else {
             const newItem = {
               ...item,
-              status: 'watchlist',
+              status: 'completed',
               currentSeason: 1,
-              currentEpisode: 0,
+              currentEpisode: defaultTotalEp,
+              totalEpisodes: defaultTotalEp,
               isFavorite: true,
               updatedAt: new Date().toISOString()
             };
             collection.value.push(newItem);
-            if (item) item.isFavorite = true;
+            if (item) { item.isFavorite = true; item.status = 'completed'; }
 
             saveCollection();
             showToast(`"${item.title}" marqué comme À revoir 🔄`, 'success');
@@ -3787,14 +3894,11 @@
           showToast(`"${item.title}" mis à jour (${targetStatus === 'in_progress' ? 'En cours' : targetStatus === 'completed' ? 'Terminé' : 'À voir'})`, 'success');
         };
 
-        // Quick "En cours" button: opens the modal if already in progress (to adjust
-        // season/episode), otherwise starts tracking directly at episode 1.
+        // Quick "En cours" button: starts tracking then always jumps to the film's page,
+        // since starting to watch is exactly when you want to set season/episode.
         const quickStartWatching = (item) => {
-          if (getItemStatus(item) === 'in_progress') {
-            openMediaDetail(item);
-          } else {
-            saveItem(item, 'in_progress');
-          }
+          saveItem(item, 'in_progress');
+          openMediaDetail(item);
         };
 
         // Quick Episode +/- Controls
