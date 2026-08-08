@@ -3939,16 +3939,7 @@
             saveCollection();
             showToast(`"${title}" retiré de la bibliothèque`, 'info');
             if (selectedMedia.value && selectedMedia.value.id === itemId) {
-              // Stay on this page instead of navigating back - reflect that it's no longer
-              // tracked (no status selected, matching how a never-added item looks).
-              selectedMedia.value.status = null;
-              selectedMedia.value.isFavorite = false;
-              selectedMedia.value.currentSeason = 1;
-              selectedMedia.value.currentEpisode = 0;
-              modalStatus.value = null;
-              modalFavorite.value = false;
-              modalSeason.value = 1;
-              modalEpisode.value = 0;
+              closeDetailView();
             }
           }
         };

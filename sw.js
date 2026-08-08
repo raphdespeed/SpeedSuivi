@@ -1,7 +1,7 @@
 // Must be bumped on every release (match the app's vX.Y.Z tag): stale-while-revalidate
 // caches each file independently, so an unchanged name across a deploy can leave an old
 // JS module cached alongside a newer index.html that expects it — a version-skew crash.
-const CACHE_NAME = 'speedsuivi-v1.7.37';
+const CACHE_NAME = 'speedsuivi-v1.7.38';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
