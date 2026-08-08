@@ -3937,7 +3937,12 @@
             }
           }
 
-          closeDetailView();
+          // Stay on this page instead of navigating back - reflect what was just saved so
+          // the tracking module and any status badges here stay accurate.
+          selectedMedia.value.status = targetStatus;
+          selectedMedia.value.currentSeason = modalSeason.value;
+          selectedMedia.value.currentEpisode = modalEpisode.value;
+          if (isMarkingRewatch) selectedMedia.value.isFavorite = true;
         };
 
         const cancelModalChanges = () => {
