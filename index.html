@@ -1071,36 +1071,27 @@
               </div>
               <div class="p-3 flex flex-col flex-1">
                 <h3 class="font-heading font-bold text-sm text-white line-clamp-2 mb-2 leading-snug" :title="item.title">{{ item.title }}</h3>
-                <div class="mt-auto pt-2 flex gap-1.5">
+                <div class="mt-auto pt-2">
                   <button
                     v-if="getItemStatus(item) === 'in_progress'"
                     @click.stop="openModal(item)"
-                    class="w-full text-xs font-heading font-bold py-1.5 px-2 rounded-lg bg-netflixRed/20 text-netflixRed border border-netflixRed/40 text-center"
-                  >✓ En cours<span v-if="isFavoriteItem(item.id)"> 🔄</span></button>
+                    class="w-full text-[10px] font-heading font-bold py-1.5 px-2 rounded-lg bg-netflixRed/20 text-netflixRed border border-netflixRed/40 text-center"
+                  >✓ En cours</button>
                   <button
                     v-else-if="getItemStatus(item) === 'watchlist'"
                     @click.stop="openModal(item)"
-                    class="w-full text-xs font-heading font-bold py-1.5 px-2 rounded-lg bg-traktPurple/20 text-traktPurple border border-traktPurple/40 text-center"
-                  >✓ À voir<span v-if="isFavoriteItem(item.id)"> 🔄</span></button>
+                    class="w-full text-[10px] font-heading font-bold py-1.5 px-2 rounded-lg bg-traktPurple/20 text-traktPurple border border-traktPurple/40 text-center"
+                  >✓ À voir</button>
                   <button
                     v-else-if="getItemStatus(item) === 'completed'"
                     @click.stop="openModal(item)"
-                    class="w-full text-xs font-heading font-bold py-1.5 px-2 rounded-lg bg-successGreen/20 text-successGreen border border-successGreen/40 text-center"
-                  >✓ Terminé<span v-if="isFavoriteItem(item.id)"> 🔄</span></button>
-                  <template v-else>
-                    <button
-                      @click="saveItem(item, 'in_progress')"
-                      class="flex-1 text-xs font-heading font-bold py-1.5 bg-netflixRed hover:bg-netflixRedHover text-white rounded-lg transition-colors"
-                    >
-                      + En cours
-                    </button>
-                    <button
-                      @click="saveItem(item, 'watchlist')"
-                      class="flex-1 text-xs font-heading font-bold py-1.5 bg-traktPurple hover:opacity-90 text-white rounded-lg transition-colors"
-                    >
-                      + À voir
-                    </button>
-                  </template>
+                    class="w-full text-[10px] font-heading font-bold py-1.5 px-2 rounded-lg bg-successGreen/20 text-successGreen border border-successGreen/40 text-center"
+                  >✓ Terminé</button>
+                  <div v-else class="grid grid-cols-3 gap-1.5">
+                    <button @click.stop="quickStartWatching(item)" class="text-[10px] font-heading font-bold py-1.5 px-1 rounded-lg text-center bg-netflixRed hover:bg-netflixRedHover text-white truncate">En cours</button>
+                    <button @click.stop="saveItem(item, 'watchlist')" class="text-[10px] font-heading font-bold py-1.5 px-1 rounded-lg text-center bg-traktPurple hover:opacity-90 text-white truncate">À voir</button>
+                    <button @click.stop="saveItem(item, 'completed')" class="text-[10px] font-heading font-bold py-1.5 px-1 rounded-lg text-center bg-successGreen hover:opacity-90 text-black truncate">Terminé</button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1491,8 +1482,8 @@
               :class="['py-3 px-4 text-xs font-heading font-bold rounded-xl border transition-all flex items-center justify-center gap-2', modalStatus === 'completed' ? 'bg-successGreen border-successGreen text-black font-bold shadow-lg shadow-successGreen/30' : 'bg-surfaceBg border-white/10 text-gray-400 hover:text-white hover:bg-white/5']"
             >✅ Terminé</button>
             <button
-              @click="modalStatus = modalStatus === 'favorites' ? null : 'favorites'"
-              :class="['py-3 px-4 text-xs font-heading font-bold rounded-xl border transition-all flex items-center justify-center gap-2', modalStatus === 'favorites' ? 'bg-amber-500 border-amber-500 text-black shadow-lg shadow-amber-500/30' : 'bg-surfaceBg border-white/10 text-gray-400 hover:text-white hover:bg-white/5']"
+              @click="toggleModalFavorite"
+              :class="['py-3 px-4 text-xs font-heading font-bold rounded-xl border transition-all flex items-center justify-center gap-2', modalFavorite ? 'bg-amber-500 border-amber-500 text-black shadow-lg shadow-amber-500/30' : 'bg-surfaceBg border-white/10 text-gray-400 hover:text-white hover:bg-white/5']"
             >🔄 À revoir</button>
           </div>
           <p v-if="!modalStatus" class="text-[11px] text-gray-500 -mt-2">Choisis un statut ci-dessus (reclique dessus pour désélectionner).</p>
@@ -2211,6 +2202,7 @@
         const showFullBio = ref(false);
 
         const modalStatus = ref('in_progress');
+        const modalFavorite = ref(false);
         const modalSeason = ref(1);
         const modalEpisode = ref(0);
         const modalRecommendations = ref([]);
@@ -2732,10 +2724,8 @@
           // always reflects what was just chosen on the poster, not stale/absent fields.
           const tracked = collection.value.find(i => i.id === item.id);
           selectedMedia.value = tracked ? { ...item, ...tracked } : item;
-          // "À revoir" isn't a real status (it's the separate isFavorite flag), but it's
-          // shown as one of the 4 tracking buttons - reflect it here if set, since it's
-          // otherwise not visible anywhere on this page anymore.
-          modalStatus.value = selectedMedia.value.isFavorite ? 'favorites' : (selectedMedia.value.status || null);
+          modalStatus.value = selectedMedia.value.status || null;
+          modalFavorite.value = !!selectedMedia.value.isFavorite;
           modalSeason.value = selectedMedia.value.currentSeason || 1;
           modalEpisode.value = selectedMedia.value.currentEpisode || 0;
           
@@ -3956,10 +3946,19 @@
               selectedMedia.value.currentSeason = 1;
               selectedMedia.value.currentEpisode = 0;
               modalStatus.value = null;
+              modalFavorite.value = false;
               modalSeason.value = 1;
               modalEpisode.value = 0;
             }
           }
+        };
+
+        // "À revoir" pairs with Terminé automatically (a rewatch candidate is by definition
+        // already seen), same as the quick toggle on the cards. Deselecting it afterward
+        // just drops the flag - the real status picked stays as-is.
+        const toggleModalFavorite = () => {
+          modalFavorite.value = !modalFavorite.value;
+          if (modalFavorite.value) modalStatus.value = 'completed';
         };
 
         const saveModalChanges = () => {
@@ -3969,38 +3968,24 @@
             return;
           }
 
-          const isMarkingRewatch = modalStatus.value === 'favorites';
-          // "À revoir" isn't a real status - it's the separate isFavorite flag. Save under
-          // the item's existing real status if it has one, defaulting to "Terminé" since a
-          // rewatch candidate is normally something already seen.
-          const targetStatus = isMarkingRewatch
-            ? (selectedMedia.value.status && selectedMedia.value.status !== 'favorites' ? selectedMedia.value.status : 'completed')
-            : modalStatus.value;
-
-          saveItem(selectedMedia.value, targetStatus, {
+          saveItem(selectedMedia.value, modalStatus.value, {
             currentSeason: modalSeason.value,
             currentEpisode: modalEpisode.value
           });
 
-          if (isMarkingRewatch) {
-            const idx = collection.value.findIndex(i => i.id === selectedMedia.value.id);
-            if (idx >= 0 && !collection.value[idx].isFavorite) {
-              collection.value[idx] = { ...collection.value[idx], isFavorite: true, updatedAt: new Date().toISOString() };
-              saveCollection();
-            }
+          const idx = collection.value.findIndex(i => i.id === selectedMedia.value.id);
+          if (idx >= 0 && !!collection.value[idx].isFavorite !== modalFavorite.value) {
+            collection.value[idx] = { ...collection.value[idx], isFavorite: modalFavorite.value, updatedAt: new Date().toISOString() };
+            saveCollection();
           }
 
-          // Stay on this page instead of navigating back - reflect what was just saved so
-          // the tracking module and any status badges here stay accurate.
-          selectedMedia.value.status = targetStatus;
-          selectedMedia.value.currentSeason = modalSeason.value;
-          selectedMedia.value.currentEpisode = modalEpisode.value;
-          if (isMarkingRewatch) selectedMedia.value.isFavorite = true;
+          closeDetailView();
         };
 
         const cancelModalChanges = () => {
           if (!selectedMedia.value) return;
-          modalStatus.value = selectedMedia.value.isFavorite ? 'favorites' : (selectedMedia.value.status || null);
+          modalStatus.value = selectedMedia.value.status || null;
+          modalFavorite.value = !!selectedMedia.value.isFavorite;
           modalSeason.value = selectedMedia.value.currentSeason || 1;
           modalEpisode.value = selectedMedia.value.currentEpisode || 0;
         };
@@ -4250,6 +4235,8 @@
           showFullBio,
           activeLightboxImage,
           modalStatus,
+          modalFavorite,
+          toggleModalFavorite,
           modalSeason,
           modalEpisode,
           modalRecommendations,
