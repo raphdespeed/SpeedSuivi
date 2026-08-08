@@ -1408,13 +1408,6 @@
               <span v-if="selectedMedia.voteAverage" class="bg-amber-500/20 border border-amber-500/40 text-amber-400 text-xs font-heading font-bold px-3 py-1 rounded-full">
                 ⭐ {{ selectedMedia.voteAverage }}/10
               </span>
-              <button 
-                @click="toggleFavorite(selectedMedia)"
-                :class="['ml-auto text-xs font-heading font-bold px-3.5 py-1.5 rounded-full flex items-center gap-1.5 border transition-all active:scale-95 shadow-lg backdrop-blur-md', isFavoriteItem(selectedMedia.id) ? 'bg-netflixRed text-white border-netflixRed' : 'bg-white/10 hover:bg-white/20 text-gray-300 border-white/10']"
-              >
-                <span>🔄</span>
-                <span>{{ isFavoriteItem(selectedMedia.id) ? 'À revoir' : 'Marquer À revoir' }}</span>
-              </button>
             </div>
             <h1 class="font-heading font-extrabold text-2xl md:text-4xl text-white whitespace-normal break-words leading-tight drop-shadow-md">
               {{ selectedMedia.title }}
@@ -2714,7 +2707,10 @@
           saveScrollPosition();
           selectedPerson.value = null;
           selectedMedia.value = item;
-          modalStatus.value = item.status || null;
+          // "À revoir" isn't a real status (it's the separate isFavorite flag), but it's
+          // shown as one of the 4 tracking buttons - reflect it here if set, since it's
+          // otherwise not visible anywhere on this page anymore.
+          modalStatus.value = item.isFavorite ? 'favorites' : (item.status || null);
           modalSeason.value = item.currentSeason || 1;
           modalEpisode.value = item.currentEpisode || 0;
           
@@ -3919,16 +3915,34 @@
             showToast('Choisis un statut (En cours, À voir, Terminé...) avant d\'enregistrer', 'info');
             return;
           }
-          saveItem(selectedMedia.value, modalStatus.value, {
+
+          const isMarkingRewatch = modalStatus.value === 'favorites';
+          // "À revoir" isn't a real status - it's the separate isFavorite flag. Save under
+          // the item's existing real status if it has one, defaulting to "Terminé" since a
+          // rewatch candidate is normally something already seen.
+          const targetStatus = isMarkingRewatch
+            ? (selectedMedia.value.status && selectedMedia.value.status !== 'favorites' ? selectedMedia.value.status : 'completed')
+            : modalStatus.value;
+
+          saveItem(selectedMedia.value, targetStatus, {
             currentSeason: modalSeason.value,
             currentEpisode: modalEpisode.value
           });
+
+          if (isMarkingRewatch) {
+            const idx = collection.value.findIndex(i => i.id === selectedMedia.value.id);
+            if (idx >= 0 && !collection.value[idx].isFavorite) {
+              collection.value[idx] = { ...collection.value[idx], isFavorite: true, updatedAt: new Date().toISOString() };
+              saveCollection();
+            }
+          }
+
           closeDetailView();
         };
 
         const cancelModalChanges = () => {
           if (!selectedMedia.value) return;
-          modalStatus.value = selectedMedia.value.status || null;
+          modalStatus.value = selectedMedia.value.isFavorite ? 'favorites' : (selectedMedia.value.status || null);
           modalSeason.value = selectedMedia.value.currentSeason || 1;
           modalEpisode.value = selectedMedia.value.currentEpisode || 0;
         };
